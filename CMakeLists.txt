@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.1.0)
 
+file(GLOB_RECURSE SRC_FILES 
+	"src/*.cpp"
+	"libs/imgui/backends/imgui_impl_glfw.h"
+    "libs/imgui/backends/imgui_impl_glfw.cpp"
+    "libs/imgui/backends/imgui_impl_opengl3.h"
+    "libs/imgui/backends/imgui_impl_opengl3.cpp"
+)
 file(GLOB_RECURSE RES_FILES "res/*.vs" "res/*.fs" "res/*.jpg" "res/*.obj")
 file(COPY ${RES_FILES} DESTINATION "res")
 
@@ -26,12 +33,23 @@ add_subdirectory(libs/glm)
 
 # Box2D
 add_subdirectory(libs/box2d)
+set(BOX2D_BUILD_UNIT_TESTS OFF)
+set(BOX2D_BUILD_TESTBED OFF)
+set(BOX2D_BUILD_DOCS OFF)
+set(BOX2D_USER_SETTINGS OFF)
 
-# Game
-file(GLOB_RECURSE SRC_FILES "src/*.cpp")
+# ImGui
+file(GLOB IMGUI_SOURCES
+		"libs/imgui/*.cpp"
+		"libs/imgui/*.h"
+)
+add_library(imgui STATIC ${IMGUI_SOURCES})
+target_include_directories(imgui PUBLIC "libs/imgui")
+
+# Blobolution
 include_directories(src/)
-add_executable(Game ${SRC_FILES})
-target_link_libraries(Game PRIVATE glfw glad glm box2d)
+add_executable(Blobolution ${SRC_FILES})
+target_link_libraries(Blobolution PRIVATE glfw glad glm box2d imgui)
 
 
 

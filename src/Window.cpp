@@ -3,15 +3,14 @@
 #include <iostream>
 #include <stdio.h>
 
-#include "imgui.h"
-#include "examples/imgui_impl_glfw.h"
-#include "examples/imgui_impl_opengl3.h"
+// #include "imgui.h"
+// #include "imgui/backends/imgui_impl_glfw.h"
+// #include "imgui/backends/imgui_impl_opengl3.h"
 
-#define IMGUI_IMPL_OPENGL_LOADER_GLAD
+// #define IMGUI_IMPL_OPENGL_LOADER_GLAD
 
-#include "examples/imgui_impl_glfw.cpp"
-#include "examples/imgui_impl_opengl3.cpp"
-
+// #include "imgui/backends/imgui_impl_glfw.cpp"
+// #include "imgui/backends/imgui_impl_opengl3.cpp"
 
 Window::~Window()
 {
@@ -92,16 +91,16 @@ Window::Window(int width, int height, std::string title)
 	});
 
 
-	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
+	// // Setup Dear ImGui context
+	// IMGUI_CHECKVERSION();
+	// ImGui::CreateContext();
 
-	// Setup Dear ImGui style
-	ImGui::StyleColorsDark();
+	// // Setup Dear ImGui style
+	// ImGui::StyleColorsDark();
 
-	// Setup Platform/Renderer bindings
-	ImGui_ImplGlfw_InitForOpenGL(window_, true);
-	ImGui_ImplOpenGL3_Init("#version 410");
+	// // Setup Platform/Renderer bindings
+	// ImGui_ImplGlfw_InitForOpenGL(window_, true);
+	// ImGui_ImplOpenGL3_Init("#version 410");
 }
 
 void Window::onUpdate()
@@ -112,9 +111,9 @@ void Window::onUpdate()
 
 void Window::onShutdown()
 {
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
+	// ImGui_ImplOpenGL3_Shutdown();
+	// ImGui_ImplGlfw_Shutdown();
+	// ImGui::DestroyContext();
 
 	glfwDestroyWindow(window_);
 	glfwTerminate();

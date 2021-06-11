@@ -1,7 +1,7 @@
 #include "BatchRenderer2D.h"
 
 #include <iostream>
-#include <Glad/glad.h>
+#include <glad/glad.h>
 
 namespace renderer
 {

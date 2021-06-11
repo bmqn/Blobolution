@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "Glad/glad.h"
+#include "glad/glad.h"
 #include "glm/glm.hpp"
 
 struct RendererStats

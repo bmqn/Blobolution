@@ -3,7 +3,7 @@
 #include <iostream>
 #include <vector>
 
-#include "Car.h";
+#include "Car.h"
 #include "Platform.h"
 #include "Renderer.h"
 

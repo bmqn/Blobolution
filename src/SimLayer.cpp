@@ -5,10 +5,6 @@
 #include "glm/glm.hpp"
 #include "glm/gtx/transform.hpp"
 
-#include "imgui.h"
-#include "examples/imgui_impl_glfw.h"
-#include "examples/imgui_impl_opengl3.h"
-
 bool SimLayer::onMouseMoved(MouseMovedEvent& e)
 {
 	if (mousePressed_ && !followCam_)
@@ -80,30 +76,30 @@ void SimLayer::onUpdate(float delta)
 
 	auto stats = renderer_.getRendererStats();
 
-	ImGui_ImplOpenGL3_NewFrame();
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::NewFrame();
+	// ImGui_ImplOpenGL3_NewFrame();
+	// ImGui_ImplGlfw_NewFrame();
+	// ImGui::NewFrame();
 
-	ImGui::Begin("Options");
+	// ImGui::Begin("Options");
 
-	ImGui::BeginChild("Infomation", ImVec2(0, 80));
-	ImGui::Text("Delta (ms) %f", delta);
-	ImGui::Text("Render Submissions %d", stats.rendererSubmissions);
-	ImGui::Text("Render Vertices %d", stats.rendererVertices);
-	ImGui::Text("Render Draws %d", stats.rendererDrawCalls);
-	ImGui::EndChild();
+	// ImGui::BeginChild("Infomation", ImVec2(0, 80));
+	// ImGui::Text("Delta (ms) %f", delta);
+	// ImGui::Text("Render Submissions %d", stats.rendererSubmissions);
+	// ImGui::Text("Render Vertices %d", stats.rendererVertices);
+	// ImGui::Text("Render Draws %d", stats.rendererDrawCalls);
+	// ImGui::EndChild();
 
-	ImGui::Separator();
+	// ImGui::Separator();
 
-	ImGui::BeginChild("Settings", ImVec2(0, 60));
-	ImGui::SliderFloat("Time Scale", &timeScale_, 0.1f, 5.0f);
-	ImGui::Checkbox("Follow Camera", &followCam_);
-	ImGui::EndChild();
+	// ImGui::BeginChild("Settings", ImVec2(0, 60));
+	// ImGui::SliderFloat("Time Scale", &timeScale_, 0.1f, 5.0f);
+	// ImGui::Checkbox("Follow Camera", &followCam_);
+	// ImGui::EndChild();
 
-	ImGui::End();
+	// ImGui::End();
 
-	ImGui::Render();
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	// ImGui::Render();
+	// ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 void SimLayer::onEvent(Event& e)
