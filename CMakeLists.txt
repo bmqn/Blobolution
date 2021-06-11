@@ -16,10 +16,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Box2D
 add_subdirectory(libs/box2d)
-option(BOX2D_BUILD_UNIT_TESTS "Build the Box2D unit tests" OFF)
-option(BOX2D_BUILD_TESTBED "Build the Box2D testbed" OFF)
-option(BOX2D_BUILD_DOCS "Build the Box2D documentation" OFF)
-option(BOX2D_USER_SETTINGS "Override Box2D settings with b2UserSettings.h" OFF)
+set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "" FORCE)
+set(BOX2D_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(BOX2D_USER_SETTINGS OFF CACHE BOOL "" FORCE)
 
 # GLFW
 add_subdirectory(libs/glfw)
