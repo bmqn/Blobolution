@@ -2,8 +2,8 @@
 
 #include <vector>
 
-#include "glad/glad.h"
-#include "glm/glm.hpp"
+#include <glad/glad.h>
+#include <glm/glm.hpp>
 
 struct RendererStats
 {
@@ -25,7 +25,7 @@ struct BatchRendererData
 	int verticesCount;
 	GLuint program;
 	GLuint vao, vbo;
-	Vertex* batchDataPtr;
+	Vertex *batchDataPtr;
 
 	BatchRendererData() : verticesCount(0), program(0), vao(0), vbo(0), batchDataPtr(nullptr) {}
 };
@@ -38,36 +38,35 @@ public:
 
 private:
 	// Renderer debug variables
-	RendererStats rendererStats_;
+	RendererStats m_RendererStats;
 
 	// Triangle Renderer Data
-	BatchRendererData triangleRendererData_;
+	BatchRendererData m_TriangleRendererData;
 
 	// Line Renderer Data
-	BatchRendererData lineRendererData_;
+	BatchRendererData m_LineRendererData;
 
-	glm::mat4 viewProj_;
+	glm::mat4 m_ViewProj;
 
 private:
 	void initTriangleRenderer();
 	void cleanupTriangleRenderer();
 	void flushTriangleVertices();
 	void mapTriangleBuffer();
+	void unmapTriangleBuffer();
 
 	void initLineRenderer();
 	void cleanupLineRenderer();
 	void flushLineVertices();
 	void mapLineBuffer();
+	void unmapLineBuffer();
 
 public:
-	static void clear();
-
-	void beginScene(const glm::mat4& viewProj);
+	void beginScene(const glm::mat4 &viewProj);
 	void endScene();
 	void flushScene();
 
-	void submitFilledPolygon(const std::vector<glm::vec2>& vertices, const glm::vec4& colour);
+	void submitFilledPolygon(const std::vector<glm::vec2> &vertices, const glm::vec4 &colour);
 
 	RendererStats getRendererStats();
 };
-

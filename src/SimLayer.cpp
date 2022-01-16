@@ -1,52 +1,88 @@
 #include "SimLayer.h"
+#include "Application.h"
+#include "Log.h"
 
-#include "GLFW/glfw3.h"
+#include <GLFW/glfw3.h>
 
-#include "glm/glm.hpp"
-#include "glm/gtx/transform.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtx/transform.hpp>
 
-bool SimLayer::onMouseMoved(MouseMovedEvent& e)
+bool SimLayer::onMouseMoved(MouseMovedEvent &e)
 {
-	if (mousePressed_ && !followCam_)
+	static double xpos = 0.0;
+	static double ypos = 0.0;
+
+	if (m_MousePressed && !m_FollowCam)
 	{
-		camPosition_ -= glm::vec3{ e.xpos_ - xpos_, ypos_ - e.ypos_, 0.0f } * (0.05f / camScale_);
+		m_CamPosition -= glm::vec3{e.Xpos - xpos, ypos - e.Ypos, 0.0f} * (0.05f / m_CamScale);
 	}
 
-	xpos_ = e.xpos_;
-	ypos_ = e.ypos_;
+	xpos = e.Xpos;
+	ypos = e.Ypos;
 
 	return false;
 }
 
-bool SimLayer::onMousePressed(MousePressedEvent& e)
+bool SimLayer::onMousePressed(MousePressedEvent &e)
 {
-	if (e.button_ == GLFW_MOUSE_BUTTON_1)
+	if (e.Button == GLFW_MOUSE_BUTTON_1)
 	{
-		if (e.action_ == GLFW_PRESS)
-			mousePressed_ = true;
+		if (e.Action == GLFW_PRESS)
+			m_MousePressed = true;
 		else
-			mousePressed_ = false;
+			m_MousePressed = false;
 	}
 
 	return false;
 }
 
-bool SimLayer::onMouseScrolled(MouseScrolledEvent& e)
+bool SimLayer::onMouseScrolled(MouseScrolledEvent &e)
 {
-	camScale_ += e.yoffset_ * (0.3f * camScale_);
+	m_CamScale += e.Yoffset * (0.3f * m_CamScale);
 
-	if (camScale_ < 0.01f)
-		camScale_ = 0.01f;
-	if (camScale_ > 2.0f)
-		camScale_ = 2.0f;
+	if (m_CamScale < 0.01f)
+		m_CamScale = 0.01f;
+	if (m_CamScale > 2.0f)
+		m_CamScale = 2.0f;
 
 	return false;
 }
 
-SimLayer::SimLayer() :
-	gen_(10), renderer_(), camPosition_(0, 0, 0), camScale_(1.0f), timeScale_(1.0f), xpos_(0.0), ypos_(0.0), mousePressed_(false), followCam_(true)
+bool SimLayer::onKeyPressed(KeyPressedEvent &e)
 {
+	switch(e.Key)
+	{
+		case GLFW_KEY_ESCAPE:
+			Application::get().shutdown();
+			break;
+		case GLFW_KEY_Q:
+			m_TimeScale = m_TimeScale >= 10.0 ? m_TimeScale : m_TimeScale + 0.2;
+			BL_LOG_INFO("Timescale increased to ", m_TimeScale);
+			break;
+		case GLFW_KEY_F:
+			m_FollowCam = !m_FollowCam;
+			BL_LOG_INFO("Follow camera mode ", m_FollowCam ? "enabled" : "disabled");
+			break;
+		case GLFW_KEY_Z:
+			m_TimeScale = m_TimeScale > 0.2 ? m_TimeScale - 0.2 : m_TimeScale;
+			BL_LOG_INFO("Timescale decreased to ", m_TimeScale);
+			break;
+	}	
 
+	return false;
+}
+
+SimLayer::SimLayer()
+	: Layer("Simulation Layer"),
+	  m_CamPosition(0, 0, 0),
+	  m_CamScale(0.5f),
+	  m_TimeScale(1.0f),
+	  m_MousePressed(false),
+	  m_FollowCam(false),
+	  m_Generation(25)
+{
+	m_Generation.init();
+	m_Generation.beginSimulating();
 }
 
 SimLayer::~SimLayer()
@@ -55,26 +91,25 @@ SimLayer::~SimLayer()
 
 void SimLayer::onUpdate(float delta)
 {
-	gen_.update(delta * timeScale_);
+	m_Generation.update(delta * m_TimeScale);
 
-	if (followCam_)
-		camPosition_ = gen_.getPositionOfBestCar();
+	if (m_FollowCam)
+		m_CamPosition = m_Generation.getPositionOfBestCar();
 
-	float asp = 16.0f / 9.0f;
+	float width = Application::get().getWindow().getWidth();
+	float height = Application::get().getWindow().getHeight();
+	float aspect = width / height;
 
 	auto viewProj =
-		glm::ortho(-10.0f * asp, 10.0f * asp, -10.0f, 10.0f)
-		* glm::scale(glm::mat4(1.0f), glm::vec3(camScale_))
-		* glm::translate(glm::mat4(1.0f), -camPosition_);
+		glm::ortho(-10.0f * aspect, 10.0f * aspect, -10.0f, 10.0f) * glm::scale(glm::mat4(1.0f), glm::vec3(m_CamScale)) * glm::translate(glm::mat4(1.0f), -m_CamPosition);
 
-	renderer_.clear();
-	renderer_.beginScene(viewProj);
+	m_Renderer.beginScene(viewProj);
 
-	gen_.draw(renderer_);
+	m_Generation.draw(m_Renderer);
 
-	renderer_.endScene();
+	m_Renderer.endScene();
 
-	auto stats = renderer_.getRendererStats();
+	auto stats = m_Renderer.getRendererStats();
 
 	// ImGui_ImplOpenGL3_NewFrame();
 	// ImGui_ImplGlfw_NewFrame();
@@ -102,10 +137,11 @@ void SimLayer::onUpdate(float delta)
 	// ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void SimLayer::onEvent(Event& e)
+void SimLayer::onEvent(Event &e)
 {
 	EventDispatcher dispatcher(e);
 	dispatcher.dispatch<MouseMovedEvent>(std::bind(&SimLayer::onMouseMoved, this, std::placeholders::_1));
 	dispatcher.dispatch<MouseScrolledEvent>(std::bind(&SimLayer::onMouseScrolled, this, std::placeholders::_1));
 	dispatcher.dispatch<MousePressedEvent>(std::bind(&SimLayer::onMousePressed, this, std::placeholders::_1));
+	dispatcher.dispatch<KeyPressedEvent>(std::bind(&SimLayer::onKeyPressed, this, std::placeholders::_1));
 }

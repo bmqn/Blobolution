@@ -1,12 +1,12 @@
-#include <iostream>
-
 #include "Application.h"
-
 #include "SimLayer.h"
+
+#include <memory>
 
 int main()
 {
-	Application app (1280, 720, "Blobolution");
+	auto& app = Application::get();
+	
 	app.pushLayer(std::make_shared<SimLayer>());
 	app.run();
 

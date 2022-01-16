@@ -1,44 +1,296 @@
 #include "Generation.h"
 
+#include "Log.h"
+#include "Random.h"
+
 #include <iostream>
 #include <map>
 #include <random>
 #include <algorithm>
 #include <iterator>
 
-void Generation::nextGeneration()
+#include <box2d/box2d.h>
+
+template <typename T>
+static T &mutate(T &value, T amount, T min, T max)
 {
+	value += amount;
+
+	if (value < min)
+		value = min;
+	if (value > max)
+		value = max;
+
+	return value;
 }
 
-Generation::Generation(int carCount) :
-	generationCount_(1), carCount_(carCount), world_(new b2World({ 0, -10 }))
+template <typename T>
+static T &offset(T &value, T amount)
 {
-	for (int i = 0; i < carCount_; i++)
-		cars_.push_back(new Car(*world_, Car::randomCarData()));
+	value += amount;
 
-	platform_ = new Platform(*world_, 500);
+	return value;
+}
+
+Generation::Generation(int cars)
+	: m_Simulating(false)
+{
+	m_World = std::make_unique<b2World>(b2Vec2{0.0f, -10.0f});
+	m_Platform = std::make_unique<Platform>();
+	m_Cars.resize(cars);
+
+	// m_Draw.SetFlags( b2Draw::e_shapeBit );
+	// m_World->SetDebugDraw(&m_Draw);
 }
 
 Generation::~Generation()
 {
-	for (auto c : cars_)
-		delete c;
+}
 
-	delete platform_;
+void Generation::init()
+{
+	m_Platform->init(*m_World, 500);
 
-	delete world_;
+	for (auto &car : m_Cars)
+	{
+		car.init(*m_World, Car::randomCarData());
+	}
+}
+
+void Generation::beginSimulating()
+{
+	if (m_Simulating)
+	{
+		BL_LOG_WARN("Already simulating a generation.");
+		return;
+	}
+
+	m_Simulating = true;
+}
+
+void Generation::nextGeneration()
+{
+	m_Simulating = false;
+
+	int numCars = m_Cars.size();
+	int numParents = 8;
+	int numVertices = 8;
+
+	BL_ASSERT(numCars > 0, "We must have at least one car to perform natural selection.");
+
+	// Sort by fitness
+
+	std::sort(m_Cars.begin(), m_Cars.end(), [](const Car &car1, const Car &car2)
+			  { return car1.getFitness() < car2.getFitness(); });
+
+	// Select parents
+
+	BL_LOG_INFO("Selecting parents!");
+
+	std::vector<int> cumulativeFitness;
+
+	cumulativeFitness.push_back(m_Cars[0].getFitness());
+
+	for (int i = 1; i < numCars; i++)
+	{
+		cumulativeFitness.push_back(cumulativeFitness[i - 1] + m_Cars[i].getFitness());
+	}
+
+	int totalFitness = cumulativeFitness.back();
+
+	std::vector<CarData> parentsCarData;
+
+	for (int i = 0; i < numParents; i++)
+	{
+		int fitness = totalFitness > 0 ? Random::UInt(0, totalFitness) : 0;
+
+		auto upper = std::upper_bound(cumulativeFitness.begin(), cumulativeFitness.end(), fitness);
+		int index = upper == cumulativeFitness.end() ? 0 : std::distance(cumulativeFitness.begin(), upper);
+
+		BL_ASSERT(index >= 0 && index < numCars, "Invalid index (", index, ") selected for parent!");
+
+		parentsCarData.push_back(m_Cars[index].getCarData());
+	}
+
+	BL_LOG_INFO("Crossing parents!");
+
+	// Cross parents
+
+	for (int i = 0; i < numCars; i++)
+	{
+		CarData parentCarData1 = parentsCarData[Random::UInt(0, numParents)];
+		CarData parentCarData2 = parentsCarData[Random::UInt(0, numParents)];
+		CarData newCarData;
+
+		// Density
+		{
+			if (Random::Bool())
+				newCarData.Density = parentCarData1.Density;
+			else
+				newCarData.Density = parentCarData2.Density;
+		}
+
+		if (Random::Bool())
+			mutate(newCarData.Density, Random::Float() / 5.0f, 0.1f, 1.0f);
+
+		// Friction
+		{
+			if (Random::Bool())
+				newCarData.Friction = parentCarData1.Friction;
+			else
+				newCarData.Friction = parentCarData2.Friction;
+		}
+
+		if (Random::Bool())
+			mutate(newCarData.Friction, Random::Float() / 5.0f, 0.1f, 1.0f);
+
+		// Restitution
+		{
+			if (Random::Bool())
+				newCarData.Restitution = parentCarData1.Restitution;
+			else
+				newCarData.Restitution = parentCarData2.Restitution;
+		}
+
+		if (Random::Bool())
+			mutate(newCarData.Restitution, Random::Float() / 5.0f, 0.1f, 1.0f);
+
+		// Vertices
+		{
+			for (int j = 0; j < numVertices; j++)
+			{
+				if (Random::Bool())
+					newCarData.Vertices.push_back(parentCarData1.Vertices[j]);
+				else
+					newCarData.Vertices.push_back(parentCarData2.Vertices[j]);
+
+				if (Random::Bool())
+					offset(newCarData.Vertices[j].x, Random::Float() / 10.0f);
+
+				if (Random::Bool())
+					offset(newCarData.Vertices[j].y, Random::Float() / 10.0f);
+			}
+		}
+
+		// Wheels
+		{
+			int numWheels = std::min(parentCarData1.Wheels.size(), parentCarData2.Wheels.size());
+
+			for (int j = 0; j < numWheels; j++)
+			{
+				WheelData newWheelData;
+
+				// Density
+				{
+					if (Random::Bool())
+						newWheelData.Density = parentCarData1.Wheels[j].Density;
+					else
+						newWheelData.Density = parentCarData2.Wheels[j].Density;
+
+					if (Random::Bool())
+						mutate(newWheelData.Density, Random::Float() / 5.0f, 0.1f, 1.0f);
+				}
+
+				// Friction
+				{
+					if (Random::Bool())
+						newWheelData.Friction = parentCarData1.Wheels[j].Friction;
+					else
+						newWheelData.Friction = parentCarData2.Wheels[j].Friction;
+
+					if (Random::Bool())
+						mutate(newWheelData.Friction, Random::Float() / 5.0f, 0.1f, 1.0f);
+				}
+
+				// Restitution
+				{
+					if (Random::Bool())
+						newWheelData.Restitution = parentCarData1.Wheels[j].Restitution;
+					else
+						newWheelData.Restitution = parentCarData2.Wheels[j].Restitution;
+
+					if (Random::Bool())
+						mutate(newWheelData.Restitution, Random::Float() / 5.0f, 0.1f, 1.0f);
+				}
+
+				// Radius
+				{
+					if (Random::Bool())
+						newWheelData.Radius = parentCarData1.Wheels[j].Radius;
+					else
+						newWheelData.Radius = parentCarData2.Wheels[j].Radius;
+
+					if (Random::Bool())
+						mutate(newWheelData.Radius, Random::Float() / 5.0f, MIN_WHEEL_RADIUS, MAX_WHEEL_RADIUS);
+				}
+
+				// Motor Speed
+				{
+					if (Random::Bool())
+						newWheelData.MotorSpeed = parentCarData1.Wheels[j].MotorSpeed;
+					else
+						newWheelData.MotorSpeed = parentCarData2.Wheels[j].MotorSpeed;
+
+					if (Random::Bool())
+						mutate(newWheelData.MotorSpeed, Random::Float(), -MAX_WHEEL_MOTOR_SPEED, -MIN_WHEEL_MOTOR_SPEED);
+				}
+
+				// Vertex
+				{
+					if (Random::Bool())
+						newWheelData.Vertex = parentCarData1.Wheels[j].Vertex;
+					else
+						newWheelData.Vertex = parentCarData2.Wheels[j].Vertex;
+
+					if (Random::Bool())
+						mutate(newWheelData.Vertex, Random::Int(-1, 1), 0, numVertices - 1);
+				}
+
+				newCarData.Wheels.push_back(newWheelData);
+			}
+
+			if (Random::Bool())
+			{
+				int extraWheels = Random::Int(0, 2);
+
+				for (int j = 0; j < extraWheels; j++)
+				{
+					WheelData wheelData;
+
+					wheelData.Density = Random::Float() * (5.f - 1.f) + 1.f;
+					wheelData.Friction = Random::Float();
+					wheelData.Restitution = Random::Float();
+					wheelData.Radius = Random::Float() * (MAX_WHEEL_RADIUS - MIN_WHEEL_RADIUS) + MIN_WHEEL_RADIUS;
+					wheelData.MotorSpeed = -Random::Float() * (MAX_WHEEL_MOTOR_SPEED - MIN_WHEEL_MOTOR_SPEED) + MIN_WHEEL_MOTOR_SPEED;
+					wheelData.Vertex = 7 - i;
+
+					newCarData.Wheels.push_back(wheelData);
+				}
+			}
+
+			m_Cars[i].init(*m_World, newCarData);
+		}
+
+		m_Simulating = true;
+	}
 }
 
 glm::vec3 Generation::getPositionOfBestCar()
 {
-	glm::vec3 best = { cars_[0]->getPosition().x, cars_[0]->getPosition().y, 0 };
-
-
-	for (auto& car : cars_)
+	if (m_Cars.empty())
 	{
-		auto pos = car->getPosition();
+		return {0.0f, 0.0f, 0.0f};
+	}
 
-		if (pos.x > best.x)
+	b2Vec2 pos = m_Cars.front().getPosition();
+
+	glm::vec3 best = {pos.x, pos.y, 0.0f};
+
+	for (const auto &car : m_Cars)
+	{
+		pos = car.getPosition();
+
+		if (pos.x > best.x && !car.isDead())
 		{
 			best.x = pos.x;
 			best.y = pos.y;
@@ -48,206 +300,77 @@ glm::vec3 Generation::getPositionOfBestCar()
 	return best;
 }
 
+// void Generation::drawImGui()
+// {
+// 	ImGui::Begin("Generation");
 
-//void Generation::nextGeneration()
-//{
-//	float generation_fitness = 1;
-//	float average_fitness;
-//	float best_fitness = 0;
-//	CarData best_car_data;
-//
-//	for (auto c : cars_)
-//	{
-//		generation_fitness += c->get_fitness();
-//
-//		if (c->get_fitness() >= best_fitness)
-//		{
-//			best_fitness = c->get_fitness();
-//			best_car_data = c->get_car_data();
-//		}
-//	}
-//
-//	average_fitness = generation_fitness / cars_.size();
-//
-//	std::map<int, CarData> generation_parents;
-//	int index = 0;
-//
-//	for (auto c : cars_)
-//	{
-//	    float percentage_of_score = (float)c->get_fitness() / generation_fitness;
-//	    for (int i = 0; i < (int)(percentage_of_score * 10.0f) + 1; i++)
-//			generation_parents.emplace(index++, c->get_car_data());
-//	}
-//
-//	for (auto c : cars_)
-//		delete c;
-//	cars_.clear();
-//
-//	for (int i = 0; i < carCount_; i++)
-//	{
-//		int parent1 = rand() % generation_parents.size();
-//	    int parent2 = rand() % generation_parents.size();
-//
-//		CarData p1 = generation_parents[parent1];
-//		CarData p2 = generation_parents[parent2];
-//
-//		CarData parents[2] = { p1, p2 };
-//
-//		float mutation = 0.05f;
-//		CarData data;
-//
-//		for (int j = 0; j < 8; j++)
-//		{
-//			b2Vec2 pv = parents[rand() % 2].vertices[j];
-//
-//			b2Vec2 new_vert = { pv.x, pv.y };
-//			if ((float)(rand() % 1000) / 1000 < mutation)
-//			{
-//				new_vert.x += ((float)(rand() % 1000 - 500) / 500);
-//				new_vert.y += ((float)(rand() % 1000 - 500) / 500);
-//			}
-//			data.vertices[j].Set(new_vert.x, new_vert.y);
-//		}
-//
-//		int wheels = std::min(parents[0].wheels.size(), parents[1].wheels.size());
-//
-//		if ((float)(rand() % 1000) / 1000 < mutation)
-//			wheels += (rand() % 2) - 1;
-//
-//		if (wheels <= 1)
-//			wheels = 1;
-//
-//		for (int j = 0; j < wheels; j++)
-//		{
-//			WheelData wheel;
-//
-//			if (j < parents[0].wheels.size() && j < parents[1].wheels.size())
-//			{
-//				wheel.motorSpeed = parents[rand() % 2].wheels[rand() % wheels].motorSpeed;
-//				wheel.radius = parents[rand() % 2].wheels[rand() % wheels].radius;
-//				wheel.vertex = parents[rand() % 2].wheels[rand() % wheels].vertex;
-//				wheel.wheelDensity = parents[rand() % 2].wheels[rand() % wheels].wheelDensity;
-//				wheel.wheelFriction = parents[rand() % 2].wheels[rand() % wheels].wheelFriction;
-//				wheel.wheelRestitution = parents[rand() % 2].wheels[rand() % wheels].wheelRestitution;
-//			}
-//			else
-//			{
-//				wheel.radius = ((float)(rand() % 1000) / 1000) * (2 - 1) + 1;
-//				wheel.wheelDensity = 10.0f;
-//				wheel.wheelFriction = 0.5f;
-//				wheel.wheelRestitution = 0.3f;
-//				wheel.motorSpeed = ((float)(rand() % 1000) / 1000) * -50;
-//				wheel.vertex = 7 - j;
-//			}
-//
-//			if ((float)(rand() % 1000) / 1000 < mutation)
-//				wheel.motorSpeed += +((float)(rand() % 1000 - 500) / 500);
-//
-//			if ((float)(rand() % 1000) / 1000 < mutation)
-//				wheel.radius += +((float)(rand() % 1000 - 500) / 500);
-//
-//			if ((float)(rand() % 1000) / 1000 < mutation)
-//				wheel.wheelDensity += +((float)(rand() % 1000 - 500) / 500);
-//
-//			if ((float)(rand() % 1000) / 1000 < mutation)
-//				wheel.wheelFriction += +((float)(rand() % 1000 - 500) / 500);
-//
-//			if ((float)(rand() % 1000) / 1000 < mutation)
-//				wheel.wheelRestitution += +((float)(rand() % 1000 - 500) / 500);
-//
-//			data.wheels.push_back(wheel);
-//		}
-//
-//		data.chassisDensity = parents[rand() % 2].chassisDensity;
-//		data.chassisFriction = parents[rand() % 2].chassisFriction;
-//		data.chassisRestitution = parents[rand() % 2].chassisRestitution;
-//
-//		if ((float)(rand() % 1000) / 1000 < mutation)
-//			data.chassisDensity += +((float)(rand() % 1000 - 500) / 500);
-//
-//		if ((float)(rand() % 1000) / 1000 < mutation)
-//			data.chassisFriction += +((float)(rand() % 1000 - 500) / 500);
-//
-//		if ((float)(rand() % 1000) / 1000 < mutation)
-//			data.chassisRestitution += +((float)(rand() % 1000 - 500) / 500);
-//	
-//		cars_.push_back(new Car(*world_, data));
-//	}
-//
-//	printf("----------------------- Generation: %d, Average Fitness: %f -------------------------\n", generationCount_++, average_fitness);
-//	printf("--- Best Car, Fitness: %f ---\n", best_fitness);
-//	printf("--- Wheels: %d\n", best_car_data.wheels.size());
-//	for (int i = 0; i < best_car_data.wheels.size(); i++)
-//	{
-//		printf("  --- Wheel %d ---\n", i + 1);
-//		printf("    --- Motor Speed: %0.3f\n", best_car_data.wheels[i].motorSpeed);
-//		printf("    --- Radius: %0.3f\n", best_car_data.wheels[i].radius);
-//		printf("    --- Density: %0.3f\n", best_car_data.wheels[i].wheelDensity);
-//		printf("    --- Friction: %0.3f\n", best_car_data.wheels[i].wheelFriction);
-//		printf("    --- Restitution: %0.3f\n", best_car_data.wheels[i].wheelRestitution);
-//	}
-//	printf("--- Chassis Density: %0.3f\n", best_car_data.chassisDensity);
-//	printf("--- Chassis Friction: %0.3f\n", best_car_data.chassisFriction);
-//	printf("--- Chassis Restitution: %0.3f\n", best_car_data.chassisRestitution);
-//}
+// 	// ImGui::SliderFloat("Time Scale", &mTimeScale, 0.1f, 20.0f);
 
-//void Generation::drawImGui()
-//{
-//	ImGui::Begin("Generation");
-//
-//	// ImGui::SliderFloat("Time Scale", &mTimeScale, 0.1f, 20.0f);
-//
-//	ImGui::Spacing();
-//
-//	if (!ImGui::CollapsingHeader("Camera"))
-//	{
-//		ImGui::BeginChild("CameraControls", { 0, 100 }, true, ImGuiWindowFlags_AlwaysAutoResize);
-//
-//		// ImGui::DragFloat2("Position", &mCamPos.x, 0.5f);
-//		// ImGui::DragFloat("Zoom", &mCamZoom, 0.0001f, 0.0001f, 0.5f);
-//
-//		ImGui::EndChild();
-//	}
-//
-//	/*if (!ImGui::CollapsingHeader("Current Car") && mCurrentCar)
-//	{
-//			CarData best_car_data = mCurrentCar->get_car_data();
-//
-//			ImGui::Text("--- Wheels: %d\n", best_car_data.wheels.size());
-//			for (int i = 0; i < best_car_data.wheels.size(); i++)
-//			{
-//				ImGui::Text("  --- Wheel %d ---\n", i + 1);
-//				ImGui::Text("    --- Motor Speed: %0.3f\n", best_car_data.wheels[i].motorSpeed);
-//				ImGui::Text("    --- Radius: %0.3f\n", best_car_data.wheels[i].radius);
-//				ImGui::Text("    --- Density: %0.3f\n", best_car_data.wheels[i].wheelDensity);
-//				ImGui::Text("    --- Friction: %0.3f\n", best_car_data.wheels[i].wheelFriction);
-//				ImGui::Text("    --- Restitution: %0.3f\n", best_car_data.wheels[i].wheelRestitution);
-//			}
-//			ImGui::Text("--- Chassis Density: %0.3f\n", best_car_data.chassisDensity);
-//			ImGui::Text("--- Chassis Friction: %0.3f\n", best_car_data.chassisFriction);
-//			ImGui::Text("--- Chassis Restitution: %0.3f\n", best_car_data.chassisRestitution);
-//	}*/
-//
-//	ImGui::End();
-//}
+// 	ImGui::Spacing();
+
+// 	if (!ImGui::CollapsingHeader("Camera"))
+// 	{
+// 		ImGui::BeginChild("CameraControls", {0, 100}, true, ImGuiWindowFlags_AlwaysAutoResize);
+
+// 		// ImGui::DragFloat2("Position", &mCamPos.x, 0.5f);
+// 		// ImGui::DragFloat("Zoom", &mCamZoom, 0.0001f, 0.0001f, 0.5f);
+
+// 		ImGui::EndChild();
+// 	}
+
+// 	/*if (!ImGui::CollapsingHeader("Current Car") && mCurrentCar)
+// 	{
+// 			CarData best_car_data = mCurrentCar->get_car_data();
+
+// 			ImGui::Text("--- Wheels: %d\n", best_car_data.wheels.size());
+// 			for (int i = 0; i < best_car_data.wheels.size(); i++)
+// 			{
+// 				ImGui::Text("  --- Wheel %d ---\n", i + 1);
+// 				ImGui::Text("    --- Motor Speed: %0.3f\n", best_car_data.wheels[i].motorSpeed);
+// 				ImGui::Text("    --- Radius: %0.3f\n", best_car_data.wheels[i].radius);
+// 				ImGui::Text("    --- Density: %0.3f\n", best_car_data.wheels[i].wheelDensity);
+// 				ImGui::Text("    --- Friction: %0.3f\n", best_car_data.wheels[i].wheelFriction);
+// 				ImGui::Text("    --- Restitution: %0.3f\n", best_car_data.wheels[i].wheelRestitution);
+// 			}
+// 			ImGui::Text("--- Chassis Density: %0.3f\n", best_car_data.chassisDensity);
+// 			ImGui::Text("--- Chassis Friction: %0.3f\n", best_car_data.chassisFriction);
+// 			ImGui::Text("--- Chassis Restitution: %0.3f\n", best_car_data.chassisRestitution);
+// 	}*/
+
+// 	ImGui::End();
+// }
 
 void Generation::update(float delta)
 {
-	static float timer = 0;
+	static float timer = 0.0f;
+
+	if (m_Simulating)
+	{
+		m_World->Step(delta, 8, 6);
+
+		int deadCount = 0;
+
+		for (auto &car : m_Cars)
+		{
+			car.update(delta);
+
+			if (car.isDead())
+				deadCount++;
+		}
+
+		if (deadCount == m_Cars.size())
+			nextGeneration();
+	}
+
 	timer += delta;
-
-	world_->Step(delta, 8, 6);
-
-	int deadCount = 0;
-
-	if (deadCount == cars_.size())
-		nextGeneration();
 }
 
-void Generation::draw(Renderer& renderer)
+void Generation::draw(Renderer &renderer)
 {
-	for (auto& car : cars_)
-		car->draw(renderer);
+	for (const auto &car : m_Cars)
+	{
+		car.draw(renderer);
+	}
 
-	platform_->draw(renderer);
+	m_Platform->draw(renderer);
 }

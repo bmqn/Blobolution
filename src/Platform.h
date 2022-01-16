@@ -1,20 +1,22 @@
 #pragma once
 
-#include "box2d/box2d.h"
 #include "Renderer.h"
 
-#include <vector>
+#include <memory>
+
+#include <box2d/box2d.h>
 
 class Platform
 {
 
 public:
 	~Platform();
-	Platform(b2World& world, int platformCount);
 
-	void draw(Renderer& renderer);
+	void init(b2World &world, int platformCount);
+	void draw(Renderer &renderer);
 
 private:
-	b2Body* platform_;
-};
+	int m_PlatformCount;
 
+	b2Body *m_Body;
+};

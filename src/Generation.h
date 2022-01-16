@@ -1,37 +1,41 @@
 #pragma once
 
-#include <iostream>
-#include <vector>
-
+#include "Renderer.h"
 #include "Car.h"
 #include "Platform.h"
-#include "Renderer.h"
 
-#include "box2d/box2d.h"
+#include <glm/glm.hpp>
+#include <box2d/box2d.h>
+
+#include <vector>
+#include <memory>
+
 
 class Generation
 {
 
-private:	
+private:
+	using WorldPtr		= std::unique_ptr<b2World>;
+	using PlatformPtr 	= std::unique_ptr<Platform>;
 
-	int generationCount_;
-	int carCount_;
+	WorldPtr m_World;
+	PlatformPtr m_Platform;
+	std::vector<Car> m_Cars;
 
-	b2World* world_;
-
-	std::vector<Car*> cars_;
-	Platform* platform_;
+	bool m_Simulating;
 
 private:
 	void nextGeneration();
 
 public:
-	Generation(int carCount);
+	Generation(int cars);
 	~Generation();
+
+	void init();
+	void beginSimulating();
 
 	glm::vec3 getPositionOfBestCar();
 
 	void update(float delta);
-	void draw(Renderer& renderer);
+	void draw(Renderer &renderer);
 };
-

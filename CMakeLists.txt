@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.1.0)
 
-file(GLOB_RECURSE SRC_FILES 
-	"src/*.cpp"
-)
+file(GLOB_RECURSE SRC_FILES "src/**.cpp")
 file(GLOB_RECURSE RES_FILES "res/*.vs" "res/*.fs" "res/*.jpg" "res/*.obj")
 file(COPY ${RES_FILES} DESTINATION "res")
 

@@ -1,9 +1,10 @@
 #include "Renderer.h"
 
-#include "glm/ext.hpp"
+#include <glm/ext.hpp>
 
 #include <iostream>
 
+// TODO: Get capabilities
 constexpr int MAX_VERTICES = 8 * 1024;
 
 Renderer::Renderer()
@@ -20,7 +21,7 @@ Renderer::~Renderer()
 
 void Renderer::initTriangleRenderer()
 {
-	const char* vertexShaderSrc =
+	const char *vertexShaderSrc =
 		"#version 330 core\n"
 		"layout (location = 0) in vec2 a_Position;\n"
 		"layout (location = 1) in vec4 a_Colour;\n"
@@ -31,7 +32,7 @@ void Renderer::initTriangleRenderer()
 		"	v_Colour = a_Colour;\n"
 		"	gl_Position = u_ViewProj * vec4(a_Position, 0, 1);\n"
 		"}\n";
-	const char* fragmentShaderSrc =
+	const char *fragmentShaderSrc =
 		"#version 330 core\n"
 		"layout (location = 0) out vec4 o_Colour;\n"
 		"in vec4 v_Colour;\n"
@@ -50,7 +51,8 @@ void Renderer::initTriangleRenderer()
 	if (!success)
 	{
 		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		std::cout << "Vertex shader failed to compile!\n" << infoLog << std::endl;
+		std::cout << "Vertex shader failed to compile!\n"
+				  << infoLog << std::endl;
 	}
 
 	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -60,82 +62,85 @@ void Renderer::initTriangleRenderer()
 	if (!success)
 	{
 		glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-		std::cout << "Fragment shader failed to compile!\n" << infoLog << std::endl;
+		std::cout << "Fragment shader failed to compile!\n"
+				  << infoLog << std::endl;
 	}
 
-	triangleRendererData_.program = glCreateProgram();
-	glAttachShader(triangleRendererData_.program, vertexShader);
-	glAttachShader(triangleRendererData_.program, fragmentShader);
-	glLinkProgram(triangleRendererData_.program);
+	m_TriangleRendererData.program = glCreateProgram();
+	glAttachShader(m_TriangleRendererData.program, vertexShader);
+	glAttachShader(m_TriangleRendererData.program, fragmentShader);
+	glLinkProgram(m_TriangleRendererData.program);
 
-	glDetachShader(triangleRendererData_.program, vertexShader);
-	glDetachShader(triangleRendererData_.program, fragmentShader);
+	glDetachShader(m_TriangleRendererData.program, vertexShader);
+	glDetachShader(m_TriangleRendererData.program, fragmentShader);
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
 
-	glGenVertexArrays(1, &triangleRendererData_.vao);
-	glGenBuffers(1, &triangleRendererData_.vbo);
+	glGenVertexArrays(1, &m_TriangleRendererData.vao);
+	glGenBuffers(1, &m_TriangleRendererData.vbo);
 
-	glBindVertexArray(triangleRendererData_.vao);
+	glBindVertexArray(m_TriangleRendererData.vao);
 
-	glBindBuffer(GL_ARRAY_BUFFER, triangleRendererData_.vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * MAX_VERTICES, (GLvoid*)0, GL_DYNAMIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, m_TriangleRendererData.vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * MAX_VERTICES, (GLvoid *)0, GL_DYNAMIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)0);
 
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(2 * sizeof(float)));
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)(2 * sizeof(float)));
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glBindVertexArray(0);
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void Renderer::mapTriangleBuffer()
 {
-	if (triangleRendererData_.verticesCount != 0) return;
-
 	// Remap the buffer
-	glBindBuffer(GL_ARRAY_BUFFER, triangleRendererData_.vbo);
-	triangleRendererData_.batchDataPtr = (Vertex*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	glBindBuffer(GL_ARRAY_BUFFER, m_TriangleRendererData.vbo);
+	m_TriangleRendererData.batchDataPtr = (Vertex *)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void Renderer::unmapTriangleBuffer()
+{
+	// Unmap the buffer
+	glBindBuffer(GL_ARRAY_BUFFER, m_TriangleRendererData.vbo);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void Renderer::cleanupTriangleRenderer()
 {
-	glDeleteProgram(triangleRendererData_.program);
-	glDeleteBuffers(1, &triangleRendererData_.vbo);
-	glDeleteVertexArrays(1, &triangleRendererData_.vao);
+	glDeleteProgram(m_TriangleRendererData.program);
+	glDeleteBuffers(1, &m_TriangleRendererData.vbo);
+	glDeleteVertexArrays(1, &m_TriangleRendererData.vao);
 }
 
 void Renderer::flushTriangleVertices()
 {
+	unmapTriangleBuffer();
+
 	// Check that there are actual vertices to flush
-	if (triangleRendererData_.verticesCount == 0) return;
+	if (m_TriangleRendererData.verticesCount == 0)
+		return;
 
-	glBindBuffer(GL_ARRAY_BUFFER, triangleRendererData_.vbo);
-	glUnmapBuffer(GL_ARRAY_BUFFER);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	glUseProgram(triangleRendererData_.program);
-	glBindVertexArray(triangleRendererData_.vao);
-	glDrawArrays(GL_TRIANGLES, 0, triangleRendererData_.verticesCount);
+	glUseProgram(m_TriangleRendererData.program);
+	glBindVertexArray(m_TriangleRendererData.vao);
+	glDrawArrays(GL_TRIANGLES, 0, m_TriangleRendererData.verticesCount);
 	glBindVertexArray(0);
 	glUseProgram(0);
 
-	rendererStats_.rendererVertices += triangleRendererData_.verticesCount;
-	rendererStats_.rendererDrawCalls += 1;
+	m_RendererStats.rendererVertices += m_TriangleRendererData.verticesCount;
+	m_RendererStats.rendererDrawCalls += 1;
 
-	triangleRendererData_.verticesCount = 0;
+	m_TriangleRendererData.verticesCount = 0;
 }
 
 void Renderer::initLineRenderer()
 {
-	const char* vertexShaderSrc =
+	const char *vertexShaderSrc =
 		"#version 330 core\n"
 		"layout (location = 0) in vec2 a_Position;\n"
 		"layout (location = 1) in vec4 a_Colour;\n"
@@ -146,7 +151,7 @@ void Renderer::initLineRenderer()
 		"	v_Colour = a_Colour;\n"
 		"	gl_Position = u_ViewProj * vec4(a_Position, 0, 1);\n"
 		"}\n";
-	const char* fragmentShaderSrc =
+	const char *fragmentShaderSrc =
 		"#version 330 core\n"
 		"layout (location = 0) out vec4 o_Colour;\n"
 		"in vec4 v_Colour;\n"
@@ -165,7 +170,8 @@ void Renderer::initLineRenderer()
 	if (!success)
 	{
 		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		std::cout << "Vertex shader failed to compile!\n" << infoLog << std::endl;
+		std::cout << "Vertex shader failed to compile!\n"
+				  << infoLog << std::endl;
 	}
 
 	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -175,32 +181,33 @@ void Renderer::initLineRenderer()
 	if (!success)
 	{
 		glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-		std::cout << "Fragment shader failed to compile!\n" << infoLog << std::endl;
+		std::cout << "Fragment shader failed to compile!\n"
+				  << infoLog << std::endl;
 	}
 
-	lineRendererData_.program = glCreateProgram();
-	glAttachShader(lineRendererData_.program, vertexShader);
-	glAttachShader(lineRendererData_.program, fragmentShader);
-	glLinkProgram(lineRendererData_.program);
+	m_LineRendererData.program = glCreateProgram();
+	glAttachShader(m_LineRendererData.program, vertexShader);
+	glAttachShader(m_LineRendererData.program, fragmentShader);
+	glLinkProgram(m_LineRendererData.program);
 
-	glDetachShader(lineRendererData_.program, vertexShader);
-	glDetachShader(lineRendererData_.program, fragmentShader);
+	glDetachShader(m_LineRendererData.program, vertexShader);
+	glDetachShader(m_LineRendererData.program, fragmentShader);
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
 
-	glGenVertexArrays(1, &lineRendererData_.vao);
-	glGenBuffers(1, &lineRendererData_.vbo);
+	glGenVertexArrays(1, &m_LineRendererData.vao);
+	glGenBuffers(1, &m_LineRendererData.vbo);
 
-	glBindVertexArray(lineRendererData_.vao);
+	glBindVertexArray(m_LineRendererData.vao);
 
-	glBindBuffer(GL_ARRAY_BUFFER, lineRendererData_.vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * MAX_VERTICES, (GLvoid*)0, GL_DYNAMIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, m_LineRendererData.vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * MAX_VERTICES, (GLvoid *)0, GL_DYNAMIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)0);
 
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(2 * sizeof(float)));
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)(2 * sizeof(float)));
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -209,54 +216,58 @@ void Renderer::initLineRenderer()
 
 void Renderer::mapLineBuffer()
 {
-	if (lineRendererData_.verticesCount != 0) return;
-
 	// Remap the buffer
-	glBindBuffer(GL_ARRAY_BUFFER, lineRendererData_.vbo);
-	lineRendererData_.batchDataPtr = (Vertex*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	glBindBuffer(GL_ARRAY_BUFFER, m_LineRendererData.vbo);
+	m_LineRendererData.batchDataPtr = (Vertex *)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void Renderer::unmapLineBuffer()
+{
+	// Unmap the buffer
+	glBindBuffer(GL_ARRAY_BUFFER, m_LineRendererData.vbo);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void Renderer::cleanupLineRenderer()
 {
-	glDeleteProgram(lineRendererData_.program);
-	glDeleteBuffers(1, &lineRendererData_.vbo);
-	glDeleteVertexArrays(1, &lineRendererData_.vao);
+	glDeleteProgram(m_LineRendererData.program);
+	glDeleteBuffers(1, &m_LineRendererData.vbo);
+	glDeleteVertexArrays(1, &m_LineRendererData.vao);
 }
 
 void Renderer::flushLineVertices()
 {
+	unmapLineBuffer();
+
 	// Check that there are actual vertices to flush
-	if (lineRendererData_.verticesCount == 0) return;
+	if (m_LineRendererData.verticesCount == 0)
+		return;
 
-	glBindBuffer(GL_ARRAY_BUFFER, lineRendererData_.vbo);
-	glUnmapBuffer(GL_ARRAY_BUFFER);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	glUseProgram(lineRendererData_.program);
-	glBindVertexArray(lineRendererData_.vao);
-	glDrawArrays(GL_LINES, 0, lineRendererData_.verticesCount);
+	glUseProgram(m_LineRendererData.program);
+	glBindVertexArray(m_LineRendererData.vao);
+	glDrawArrays(GL_LINES, 0, m_LineRendererData.verticesCount);
 	glBindVertexArray(0);
 	glUseProgram(0);
 
-	rendererStats_.rendererVertices += lineRendererData_.verticesCount;
-	rendererStats_.rendererDrawCalls += 1;
+	m_RendererStats.rendererVertices += m_LineRendererData.verticesCount;
+	m_RendererStats.rendererDrawCalls += 1;
 
-	lineRendererData_.verticesCount = 0;
+	m_LineRendererData.verticesCount = 0;
 }
 
-void Renderer::submitFilledPolygon(const std::vector<glm::vec2>& vertices, const glm::vec4& colour)
+void Renderer::submitFilledPolygon(const std::vector<glm::vec2> &vertices, const glm::vec4 &colour)
 {
-	// Crude optimization... expensive.
-	auto v = viewProj_ * glm::vec4(vertices[0], 0.0f, 1.0f);
+	// Improve this optimization.
+	auto v = m_ViewProj * glm::vec4(vertices[0], 0.0f, 1.0f);
 	if (std::abs(v.x) > 1.5f || std::abs(v.y) > 1.5f)
 		return;
 
 	int vertexCount = vertices.size();
 
 	// If there is insufficient room, flush the current batch.
-	if (MAX_VERTICES - triangleRendererData_.verticesCount < (vertexCount - 2) * 3
-		|| MAX_VERTICES - lineRendererData_.verticesCount < vertexCount * 2)
+	if (MAX_VERTICES - m_TriangleRendererData.verticesCount < (vertexCount - 2) * 3 || MAX_VERTICES - m_LineRendererData.verticesCount < vertexCount * 2)
 	{
 		flushScene();
 
@@ -264,32 +275,30 @@ void Renderer::submitFilledPolygon(const std::vector<glm::vec2>& vertices, const
 		mapLineBuffer();
 	}
 
-	glm::vec4 fillColour
-	{
+	glm::vec4 fillColour{
 		colour.r * 0.5f,
 		colour.g * 0.5f,
 		colour.b * 0.5f,
-		colour.a
-	};
+		colour.a};
 
 	for (int i = 0; i < vertexCount - 2; i++)
 	{
-		triangleRendererData_.batchDataPtr->position = vertices[0];
-		triangleRendererData_.batchDataPtr->colour = fillColour;
-								   
-		triangleRendererData_.batchDataPtr++;
-								   
-		triangleRendererData_.batchDataPtr->position = vertices[i + 1];
-		triangleRendererData_.batchDataPtr->colour = fillColour;
-								   
-		triangleRendererData_.batchDataPtr++;
-								   
-		triangleRendererData_.batchDataPtr->position = vertices[i + 2];
-		triangleRendererData_.batchDataPtr->colour = fillColour;
-								   
-		triangleRendererData_.batchDataPtr++;
+		m_TriangleRendererData.batchDataPtr->position = vertices[0];
+		m_TriangleRendererData.batchDataPtr->colour = fillColour;
 
-		triangleRendererData_.verticesCount += 3;
+		m_TriangleRendererData.batchDataPtr++;
+
+		m_TriangleRendererData.batchDataPtr->position = vertices[i + 1];
+		m_TriangleRendererData.batchDataPtr->colour = fillColour;
+
+		m_TriangleRendererData.batchDataPtr++;
+
+		m_TriangleRendererData.batchDataPtr->position = vertices[i + 2];
+		m_TriangleRendererData.batchDataPtr->colour = fillColour;
+
+		m_TriangleRendererData.batchDataPtr++;
+
+		m_TriangleRendererData.verticesCount += 3;
 	}
 
 	glm::vec2 p1 = vertices[vertexCount - 1];
@@ -298,51 +307,49 @@ void Renderer::submitFilledPolygon(const std::vector<glm::vec2>& vertices, const
 	{
 		glm::vec2 p2 = vertices[i];
 
-		lineRendererData_.batchDataPtr->position = p1;
-		lineRendererData_.batchDataPtr->colour = colour;
+		m_LineRendererData.batchDataPtr->position = p1;
+		m_LineRendererData.batchDataPtr->colour = colour;
 
-		lineRendererData_.batchDataPtr++;
+		m_LineRendererData.batchDataPtr++;
 
-		lineRendererData_.batchDataPtr->position = p2;
-		lineRendererData_.batchDataPtr->colour = colour;
+		m_LineRendererData.batchDataPtr->position = p2;
+		m_LineRendererData.batchDataPtr->colour = colour;
 
-		lineRendererData_.batchDataPtr++;
+		m_LineRendererData.batchDataPtr++;
 
 		p1 = p2;
 
-		lineRendererData_.verticesCount += 2;
+		m_LineRendererData.verticesCount += 2;
 	}
 
-	rendererStats_.rendererSubmissions++;
+	m_RendererStats.rendererSubmissions++;
 }
 
-void Renderer::clear()
+void Renderer::beginScene(const glm::mat4 &viewProj)
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-}
+	if (m_TriangleRendererData.verticesCount > 0 || m_LineRendererData.verticesCount > 0)
+		endScene();
 
-void Renderer::beginScene(const glm::mat4& viewProj)
-{
-	viewProj_ = viewProj;
+	m_ViewProj = viewProj;
 
 	GLint loc;
 
-	glUseProgram(triangleRendererData_.program);
-	loc = glGetUniformLocation(triangleRendererData_.program, "u_ViewProj");
-	glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(viewProj_));
+	glUseProgram(m_TriangleRendererData.program);
+	loc = glGetUniformLocation(m_TriangleRendererData.program, "u_ViewProj");
+	glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(m_ViewProj));
 
-	glUseProgram(lineRendererData_.program);
-	loc = glGetUniformLocation(lineRendererData_.program, "u_ViewProj");
-	glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(viewProj_));
+	glUseProgram(m_LineRendererData.program);
+	loc = glGetUniformLocation(m_LineRendererData.program, "u_ViewProj");
+	glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(m_ViewProj));
 
 	glUseProgram(0);
 
 	mapTriangleBuffer();
 	mapLineBuffer();
 
-	rendererStats_.rendererDrawCalls = 0;
-	rendererStats_.rendererSubmissions = 0;
-	rendererStats_.rendererVertices = 0;
+	m_RendererStats.rendererDrawCalls = 0;
+	m_RendererStats.rendererSubmissions = 0;
+	m_RendererStats.rendererVertices = 0;
 }
 
 void Renderer::endScene()
@@ -354,11 +361,18 @@ void Renderer::endScene()
 
 void Renderer::flushScene()
 {
+	// Clear the colour and depth buffer
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// Enable blending
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	flushTriangleVertices();
 	flushLineVertices();
 }
 
 RendererStats Renderer::getRendererStats()
 {
-	return rendererStats_;
+	return m_RendererStats;
 }

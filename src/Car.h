@@ -1,51 +1,68 @@
 #pragma once
 
-#include <vector>
-
-#include "box2d/box2d.h"
-
 #include "Renderer.h"
+
+#include <box2d/box2d.h>
+
+#include <vector>
+#include <memory>
+
+const float MIN_WHEEL_RADIUS = 0.1f;
+const float MAX_WHEEL_RADIUS = 5.0f; 
+
+const float MIN_WHEEL_MOTOR_SPEED = 20.0f;
+const float MAX_WHEEL_MOTOR_SPEED = 50.0f;
 
 struct WheelData
 {
-	float radius;
-	float wheelDensity;
-	float wheelFriction;
-	float wheelRestitution;
-	float motorSpeed;
-	int vertex;
+	float Density = 1.f;
+	float Friction = 1.f;
+	float Restitution = 1.f;
+	float Radius = 1.f;
+	float MotorSpeed = -1.f;
+	int Vertex = 0;
 };
 
 struct CarData
 {
-	b2Vec2 vertices[8];
-	float chassisDensity;
-	float chassisFriction;
-	float chassisRestitution;
-	std::vector<WheelData> wheels;
+	float Density = 1.f;
+	float Friction = 1.f;
+	float Restitution = 1.f;
+	std::vector<b2Vec2> Vertices = {};
+	std::vector<WheelData> Wheels = {};
 };
 
 class Car
 {
 private:
+	b2Body *m_Body;
+	std::vector<b2Body *> m_Wheels;
+	std::vector<b2Joint *> m_Joints;
 
-	b2Body* body_;
-	std::vector<b2Body*> wheels_;
-	std::vector<b2Joint*> joints_;
+	int m_Health;
+	int m_Life;
 	
-	int health_;
-	int fitness_;
-
-	CarData carData_;
+	CarData m_CarData;
 
 public:
-	Car(b2World& world, CarData data);
+	Car();
 	~Car();
+	Car(const Car&) = delete;
+	Car(Car&& car);
+	Car& operator=(Car&& car);
 
-	const b2Vec2& getPosition() const { return body_->GetPosition(); }
+	const b2Vec2 &getPosition() const { return m_Body->GetPosition(); }
 
-	void draw(Renderer& renderer);
-	
+	bool isDead() const { return m_Health <= 0; }
+	int getFitness() const { return m_Life + (int)m_Body->GetPosition().x; }
+
+	CarData getCarData() const { return m_CarData; }
+
+	void init(b2World &world, CarData carData);
+
+	void draw(Renderer &renderer) const;
+	void update(float delta);
+
+public:
 	static CarData randomCarData();
 };
-
