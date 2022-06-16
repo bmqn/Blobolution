@@ -2,21 +2,24 @@
 
 #include "Renderer.h"
 
-#include <memory>
-
 #include <box2d/box2d.h>
 
 class Platform
 {
 
-public:
-	~Platform();
+private:
+	
 
-	void init(b2World &world, int platformCount);
-	void draw(Renderer &renderer);
+public:
+	Platform();
+
+	void Create(b2World &world, int platformCount);
+	void Destory();
+
+	void Draw();
 
 private:
-	int m_PlatformCount;
-
-	b2Body *m_Body;
+	bool    m_IsCreated;
+	b2Body* m_Body;
+	int     m_PlatformCount;
 };

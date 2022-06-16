@@ -1,7 +1,5 @@
 #pragma once
 
-#include <functional>
-
 enum class EventType
 {
 	None = 0,
@@ -12,6 +10,7 @@ enum class EventType
 	WindowMoved,
 	KeyPressed,
 	KeyReleased,
+	KeyRepeat,
 	KeyTyped,
 	MouseButtonPressed,
 	MouseButtonReleased,
@@ -22,7 +21,7 @@ enum class EventType
 class Event
 {
 public:
-	virtual EventType getEventType() const = 0;
+	virtual EventType GetType() const = 0;
 
 public:
 	bool Handled = false;
@@ -36,7 +35,7 @@ public:
 	template <typename T>
 	bool dispatch(const std::function<bool(T &e)> &func)
 	{
-		if (m_Event.getEventType() == T::getStaticEvent())
+		if (m_Event.GetType() == T::GetStaticType())
 		{
 			m_Event.Handled = func(static_cast<T &>(m_Event));
 			return true;
@@ -52,27 +51,49 @@ class WindowCloseEvent : public Event
 {
 public:
 	WindowCloseEvent() = default;
-	virtual EventType getEventType() const override { return EventType::WindowClose; }
-	static EventType getStaticEvent() { return EventType::WindowClose; }
+	virtual EventType GetType() const override { return EventType::WindowClose; }
+	static EventType GetStaticType() { return EventType::WindowClose; }
 };
 
 class WindowResizeEvent : public Event
 {
 public:
 	WindowResizeEvent(int width, int height) : Width(width), Height(height) {}
-	virtual EventType getEventType() const override { return EventType::WindowResize; }
-	static EventType getStaticEvent() { return EventType::WindowResize; }
+	virtual EventType GetType() const override { return EventType::WindowResize; }
+	static EventType GetStaticType() { return EventType::WindowResize; }
 
 public:
 	int Width, Height;
+};
+
+class KeyReleasedEvent : public Event
+{
+public:
+	KeyReleasedEvent(int key, int mods) : Key(key), Mods(mods) {}
+	virtual EventType GetType() const override { return EventType::KeyReleased; }
+	static EventType GetStaticType() { return EventType::KeyReleased; }
+
+public:
+	int Key, Mods;
 };
 
 class KeyPressedEvent : public Event
 {
 public:
 	KeyPressedEvent(int key, int mods) : Key(key), Mods(mods) {}
-	virtual EventType getEventType() const override { return EventType::KeyPressed; }
-	static EventType getStaticEvent() { return EventType::KeyPressed; }
+	virtual EventType GetType() const override { return EventType::KeyPressed; }
+	static EventType GetStaticType() { return EventType::KeyPressed; }
+
+public:
+	int Key, Mods;
+};
+
+class KeyRepeatEvent : public Event
+{
+public:
+	KeyRepeatEvent(int key, int mods) : Key(key), Mods(mods) {}
+	virtual EventType GetType() const override { return EventType::KeyRepeat; }
+	static EventType GetStaticType() { return EventType::KeyRepeat; }
 
 public:
 	int Key, Mods;
@@ -81,20 +102,31 @@ public:
 class MousePressedEvent : public Event
 {
 public:
-	MousePressedEvent(int button, int action, int mods) : Button(button), Action(action), Mods(mods) {}
-	virtual EventType getEventType() const override { return EventType::MouseButtonPressed; }
-	static EventType getStaticEvent() { return EventType::MouseButtonPressed; }
+	MousePressedEvent(int button, int mods) : Button(button), Mods(mods) {}
+	virtual EventType GetType() const override { return EventType::MouseButtonPressed; }
+	static EventType GetStaticType() { return EventType::MouseButtonPressed; }
 
 public:
-	int Button, Action, Mods;
+	int Button, Mods;
+};
+
+class MouseReleasedEvent : public Event
+{
+public:
+	MouseReleasedEvent(int button, int mods) : Button(button), Mods(mods) {}
+	virtual EventType GetType() const override { return EventType::MouseButtonReleased; }
+	static EventType GetStaticType() { return EventType::MouseButtonReleased; }
+
+public:
+	int Button, Mods;
 };
 
 class MouseMovedEvent : public Event
 {
 public:
 	MouseMovedEvent(double xpos, double ypos) : Xpos(xpos), Ypos(ypos) {}
-	virtual EventType getEventType() const override { return EventType::MouseMoved; }
-	static EventType getStaticEvent() { return EventType::MouseMoved; }
+	virtual EventType GetType() const override { return EventType::MouseMoved; }
+	static EventType GetStaticType() { return EventType::MouseMoved; }
 
 public:
 	double Xpos, Ypos;
@@ -104,8 +136,8 @@ class MouseScrolledEvent : public Event
 {
 public:
 	MouseScrolledEvent(double xoffset, double yoffset) : Xoffset(xoffset), Yoffset(yoffset) {}
-	virtual EventType getEventType() const override { return EventType::MouseScrolled; }
-	static EventType getStaticEvent() { return EventType::MouseScrolled; }
+	virtual EventType GetType() const override { return EventType::MouseScrolled; }
+	static EventType GetStaticType() { return EventType::MouseScrolled; }
 
 public:
 	double Xoffset, Yoffset;

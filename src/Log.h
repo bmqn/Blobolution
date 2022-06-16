@@ -1,43 +1,118 @@
 #pragma once
 
-#include <ctime>
-#include <iomanip>
-#include <iostream>
+#define _BL_EXPAND(x) x
+#define _BL_VARGS(_9, _8, _7, _6, _5, _4, _3, _2, _1, N, ...) N
 
-class Log
-{
-public:
-    template<typename...Args>
-    static void logInfo(Args&& ...args)
-    {
-        std::time_t now = std::time(nullptr);
+// ----- Logging -----
+#if BL_ENABLE_LOGGING
 
-        std::cout << "[INFO](" << std::put_time(std::localtime(&now), "%T") << "): ";
-        (std::cout << ... << std::forward<Args>(args));
-        std::cout << '\n';
-    }
+#define _BL_LOG1(format)                                  \
+do                                                        \
+{                                                         \
+	fprintf(stdout, "[INFO] %s:%d ", __FILE__, __LINE__); \
+	fprintf(stdout, format);                              \
+	fprintf(stdout, "\n");                                \
+} while(0)
 
-    template<typename...Args>
-    static void logWarn(Args&& ...args)
-    {
-        std::time_t now = std::time(nullptr);
+#define _BL_LOG2(format, ...)                             \
+do                                                        \
+{                                                         \
+	fprintf(stdout, "[INFO] %s:%d ", __FILE__, __LINE__); \
+	fprintf(stdout, format, __VA_ARGS__);                 \
+	fprintf(stdout, "\n");                                \
+} while(0)
 
-        std::cout << "[WARN](" << std::put_time(std::localtime(&now), "%T") << "): ";
-        (std::cout << ... << std::forward<Args>(args));
-        std::cout << '\n';
-    }
+#define _BL_LOG_CHOOSER(...) _BL_EXPAND( \
+_BL_VARGS(__VA_ARGS__,                   \
+_BL_LOG2, _BL_LOG2, _BL_LOG2,            \
+_BL_LOG2, _BL_LOG2, _BL_LOG2,            \
+_BL_LOG2, _BL_LOG2, _BL_LOG1)            \
+)
 
-    template<typename...Args>
-    static void logError(Args&& ...args)
-    {
-        std::time_t now = std::time(nullptr);
+#define BL_LOG(...) _BL_EXPAND(_BL_LOG_CHOOSER(__VA_ARGS__)(__VA_ARGS__))
 
-        std::cout << "[ERROR](" << std::put_time(std::localtime(&now), "%T") << "): ";
-        (std::cout << ... << std::forward<Args>(args));
-        std::cout << '\n';
-    }
-};
+#else
 
-#define BL_LOG_INFO(...) Log::logInfo(__VA_ARGS__)
-#define BL_LOG_WARN(...) Log::logWarn(__VA_ARGS__)
-#define BL_LOG_ERROR(...) Log::logError(__VA_ARGS__)
+#define BL_LOG(...)
+
+#endif // BL_LOGGING
+
+// --- Assertions ---
+#if BL_ENABLE_ASSERTIONS
+
+#define _BL_ASSERT1(condition)                                 \
+do                                                             \
+{                                                              \
+	if (!(condition))                                          \
+	{                                                          \
+		fprintf(stdout, "[ERROR] %s:%d ", __FILE__, __LINE__); \
+		fprintf(stdout, "Assertion failed!");                  \
+		fprintf(stdout, "\n");                                 \
+	}                                                          \
+} while(0)
+
+#define _BL_ASSERT2(condition, format)                         \
+do                                                             \
+{                                                              \
+	if (!(condition))                                          \
+	{                                                          \
+		fprintf(stdout, "[ERROR] %s:%d ", __FILE__, __LINE__); \
+		fprintf(stdout, "Assertion failed! ");                 \
+		fprintf(stdout, format);                               \
+		fprintf(stdout, "\n");                                 \
+	}                                                          \
+} while (0)
+
+#define _BL_ASSERT3(condition, format, ...)                    \
+do                                                             \
+{                                                              \
+	if (!(condition))                                          \
+	{                                                          \
+		fprintf(stdout, "[ERROR] %s:%d ", __FILE__, __LINE__); \
+		fprintf(stdout, "Assertion failed! ");                 \
+		fprintf(stdout, format, __VA_ARGS__);                  \
+		fprintf(stdout, "\n");                                 \
+	}                                                          \
+} while (0)
+
+#define _BL_ASSERT_CHOOSER(...) _BL_EXPAND( \
+_BL_VARGS(__VA_ARGS__,                      \
+_BL_ASSERT3, _BL_ASSERT3, _BL_ASSERT3,      \
+_BL_ASSERT3, _BL_ASSERT3, _BL_ASSERT3,      \
+_BL_ASSERT3, _BL_ASSERT2, _BL_ASSERT1)      \
+)
+
+#define BL_ASSERT(...) _BL_EXPAND(_BL_ASSERT_CHOOSER(__VA_ARGS__)(__VA_ARGS__))
+
+#else
+
+// We still want to execute the condition in case we rely on it !
+
+#define _BL_ASSERT1(condition)              \
+do                                          \
+{                                           \
+	if ((condition)) {}                     \
+} while (0)
+
+#define _BL_ASSERT2(condition, format)      \
+do                                          \
+{                                           \
+	if ((condition)) {}                     \
+} while (0)
+
+#define _BL_ASSERT3(condition, format, ...) \
+do                                          \
+{                                           \
+	if ((condition)) {}                     \
+} while (0)
+
+#define _BL_ASSERT_CHOOSER(...) _BL_EXPAND( \
+_BL_VARGS(__VA_ARGS__,                      \
+_BL_ASSERT3, _BL_ASSERT3, _BL_ASSERT3,      \
+_BL_ASSERT3, _BL_ASSERT3, _BL_ASSERT3,      \
+_BL_ASSERT3, _BL_ASSERT2, _BL_ASSERT1)      \
+)
+
+#define BL_ASSERT(...) _BL_EXPAND(_BL_ASSERT_CHOOSER(__VA_ARGS__)(__VA_ARGS__))
+
+#endif  // BL_ASSERTION

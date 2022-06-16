@@ -1,117 +1,130 @@
 #include "Window.h"
-
 #include "Log.h"
-
-// #include "imgui.h"
-// #include "imgui/backends/imgui_impl_glfw.h"
-// #include "imgui/backends/imgui_impl_opengl3.h"
-
-// #define IMGUI_IMPL_OPENGL_LOADER_GLAD
-
-// #include "imgui/backends/imgui_impl_glfw.cpp"
-// #include "imgui/backends/imgui_impl_opengl3.cpp"
 
 Window::~Window()
 {
-	shutdown();
+	Destroy();
 }
 
-Window::Window(int width, int height, std::string title)
+void Window::Init(int width, int height, const std::string& title)
 {
-	m_Data.Width = width;
+	m_Data.Width  = width;
 	m_Data.Height = height;
-	m_Data.Title = title;
+	m_Data.Title  = title;
 
-	int init = glfwInit();
+	// Create GLFW error callback
+	glfwSetErrorCallback([](int error, const char* description)
+	{
+		BL_LOG("GLFW Error: %s", description);
+	});
 
-	glfwSetErrorCallback([](int error, const char *description)
-						 { BL_LOG_ERROR("GLFW Error. ", description); });
+	// Init GLFW
+	if (!glfwInit())
+	{
+		BL_LOG("Failed to initialize GLFW.");
+		return;
+	}
 
+	// OpenGL version
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+	// Create the window
 	m_Window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
 
+	// Configure the window
 	glfwMakeContextCurrent(m_Window);
-
-	gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-
 	glfwSetWindowUserPointer(m_Window, &m_Data);
-
 	glfwSetWindowCloseCallback(m_Window, [](GLFWwindow *window)
-							   {
-								   WindowData &data = *(WindowData *)glfwGetWindowUserPointer(window);
-
-								   WindowCloseEvent e;
-								   data.Callback(e);
-							   });
-
+	{
+		WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
+		WindowCloseEvent e;
+		data.Callback(e);
+	});
 	glfwSetWindowSizeCallback(m_Window, [](GLFWwindow *window, int width, int height)
-							  {
-								  WindowData &data = *(WindowData *)glfwGetWindowUserPointer(window);
-
-								  WindowResizeEvent e(width, height);
-								  data.Callback(e);
-							  });
-
+	{
+		WindowData &data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+		WindowResizeEvent e(width, height);
+		data.Callback(e);
+	});
 	glfwSetKeyCallback(m_Window, [](GLFWwindow *window, int key, int scancode, int action, int mods)
-					   {
-						   WindowData &data = *(WindowData *)glfwGetWindowUserPointer(window);
-
-							switch (action)
-							{
-								case GLFW_PRESS:
-									KeyPressedEvent e(key, mods);
-						   			data.Callback(e);
-									break;
-							}
-					   });
-
+	{
+		WindowData &data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+		switch (action)
+		{
+			case GLFW_RELEASE:
+			{
+				KeyReleasedEvent e(key, mods);
+				data.Callback(e);
+				break;
+			}
+			case GLFW_PRESS:
+			{
+				KeyPressedEvent e(key, mods);
+				data.Callback(e);
+				break;
+			}
+			case GLFW_REPEAT:
+			{
+				KeyRepeatEvent e(key, mods);
+				data.Callback(e);
+				break;
+			}
+		};
+	});
 	glfwSetMouseButtonCallback(m_Window, [](GLFWwindow *window, int button, int action, int mods)
-							   {
-								   WindowData &data = *(WindowData *)glfwGetWindowUserPointer(window);
-
-								   MousePressedEvent e(button, action, mods);
-								   data.Callback(e);
-							   });
-
+	{
+		WindowData &data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+		switch (action)
+		{
+			case GLFW_RELEASE:
+			{
+				MouseReleasedEvent e(button, mods);
+				data.Callback(e);
+				break;
+			}
+			case GLFW_PRESS:
+			{
+				MousePressedEvent e(button, mods);
+				data.Callback(e);
+				break;
+			}
+		};
+	});
 	glfwSetCursorPosCallback(m_Window, [](GLFWwindow *window, double xpos, double ypos)
-							 {
-								 WindowData &data = *(WindowData *)glfwGetWindowUserPointer(window);
-
-								 MouseMovedEvent e(xpos, ypos);
-								 data.Callback(e);
-							 });
-
+	{
+		WindowData &data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+		MouseMovedEvent e(xpos, ypos);
+		data.Callback(e);
+	});
 	glfwSetScrollCallback(m_Window, [](GLFWwindow *window, double xoffset, double yoffset)
-						  {
-							  WindowData &data = *(WindowData *)glfwGetWindowUserPointer(window);
+	{
+		WindowData &data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+		MouseScrolledEvent e(xoffset, yoffset);
+		data.Callback(e);
+	});
 
-							  MouseScrolledEvent e(xoffset, yoffset);
-							  data.Callback(e);
-						  });
+	// Load OpenGL functions with GLAD
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	{
+		BL_LOG("Failed to initialize OpenGL context.");
+		Destroy();
+		return;
+	}
 
-	// // Setup Dear ImGui context
-	// IMGUI_CHECKVERSION();
-	// ImGui::CreateContext();
-
-	// // Setup Dear ImGui style
-	// ImGui::StyleColorsDark();
-
-	// // Setup Platform/Renderer bindings
-	// ImGui_ImplGlfw_InitForOpenGL(window_, true);
-	// ImGui_ImplOpenGL3_Init("#version 410");
+	BL_LOG("Succesfully initialized GLFW and loaded OpenGL.");
+	BL_LOG("OpenGL version %s, GLSL version %s.", glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
 }
 
-void Window::onUpdate()
+void Window::OnUpdate()
 {
 	glfwPollEvents();
 	glfwSwapBuffers(m_Window);
 }
 
-void Window::shutdown()
+void Window::Destroy()
 {
-	// ImGui_ImplOpenGL3_Shutdown();
-	// ImGui_ImplGlfw_Shutdown();
-	// ImGui::DestroyContext();
-
 	glfwDestroyWindow(m_Window);
 	glfwTerminate();
 }

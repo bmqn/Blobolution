@@ -1,288 +1,345 @@
 #include "Car.h"
-
 #include "Random.h"
-#include "Assert.h"
+#include "Log.h"
 
-#include <iostream>
-#include <cmath>
+static uint32_t GetNewCarId()
+{
+	static uint32_t sCarId = 0;
+	sCarId += Random::Int(0u, std::numeric_limits<uint32_t>::max() - 1);
+	return sCarId;
+}
 
 Car::Car()
-    : m_Body(nullptr),
-      m_Health(180),
-      m_Life(0)
+	: m_CarId(GetNewCarId())
+	, m_Health(0)
+	, m_ChassisBody(nullptr)
 {
 }
 
 Car::~Car()
 {
-    if (!m_Body)
-        return;
-
-    b2World *world = m_Body->GetWorld();
-
-    for (b2Joint *j : m_Joints)
-        world->DestroyJoint(j);
-
-    for (b2Body *w : m_Wheels)
-        world->DestroyBody(w);
-
-    world->DestroyBody(m_Body);
 }
 
-Car::Car(Car &&car)
+void Car::Create(b2World& world, const CarProto& carProto)
 {
-    m_Health = car.m_Health;
-    m_Life = car.m_Life;
-    m_CarData = car.m_CarData;
+	BL_ASSERT(m_ChassisBody == nullptr, "The car has already been created !");
 
-    m_Body = car.m_Body;
-    m_Wheels = car.m_Wheels;
-    m_Joints = car.m_Joints;
+	if (m_ChassisBody == nullptr)
+	{
+		m_Proto = carProto;
+		m_Health = 180;
+		m_ChassisBody = nullptr;
+		m_WheelJoints.clear();
+		m_WheelBodies.clear();
 
-    car.m_Health = 0;
-    car.m_Life = 0;
-    car.m_CarData = {};
-    car.m_Body = nullptr;
-    car.m_Wheels.clear();
-    car.m_Joints.clear();
+		b2Vec2 vertices[CarConstants::kNumVertices] = { b2Vec2_zero };
+
+		for (int i = 0; i < CarConstants::kNumVertices; i++)
+		{
+			vertices[i] = m_Proto.Vertices[i];
+		}
+
+		b2PolygonShape chassisShape;
+		chassisShape.Set(vertices, CarConstants::kNumVertices);
+
+		b2BodyDef chassisDef;
+		chassisDef.type = b2_dynamicBody;
+		chassisDef.position.Set(0, 0);
+		chassisDef.angle = 0;
+		chassisDef.userData.pointer = (uintptr_t)&m_Proto.Colour;
+
+		b2FixtureDef chassisFixture;
+		chassisFixture.shape = &chassisShape;
+		chassisFixture.density = m_Proto.Density;
+		chassisFixture.restitution = m_Proto.Restitution;
+		chassisFixture.filter.groupIndex = -1;
+
+		m_ChassisBody = world.CreateBody(&chassisDef);
+		m_ChassisBody->CreateFixture(&chassisFixture);
+
+		for (const WheelProto& wheel : m_Proto.Wheels)
+		{
+			b2CircleShape wheelShape;
+			wheelShape.m_radius = wheel.Radius;
+
+			b2BodyDef wheelDef;
+			wheelDef.type = b2_dynamicBody;
+			wheelDef.angle = 0;
+			wheelDef.userData.pointer = (uintptr_t)&wheel.Colour;
+
+			b2FixtureDef wheelFixture;
+			wheelFixture.shape = &wheelShape;
+			wheelFixture.density = wheel.Density;
+			wheelFixture.restitution = wheel.Restitution;
+			wheelFixture.filter.groupIndex = -1;
+
+			b2Body* wheelBody = world.CreateBody(&wheelDef);
+			wheelBody->CreateFixture(&wheelFixture);
+
+			m_WheelBodies.push_back(wheelBody);
+
+			b2RevoluteJointDef jointDef;
+			jointDef.collideConnected = false;
+			jointDef.enableMotor = true;
+
+			jointDef.bodyA = m_ChassisBody;
+			jointDef.bodyB = wheelBody;
+			jointDef.maxMotorTorque = m_ChassisBody->GetMass() / wheel.Radius * 100.0f;
+			jointDef.motorSpeed = wheel.MotorSpeed;
+			jointDef.localAnchorA = vertices[wheel.Vertex];
+			jointDef.localAnchorB.Set(0, 0);
+
+			m_WheelJoints.push_back(world.CreateJoint(&jointDef));
+		}
+	}
 }
 
-Car &Car::operator=(Car &&car)
+void Car::Destory()
 {
-    m_Health = car.m_Health;
-    m_Life = car.m_Life;
-    m_CarData = car.m_CarData;
+	BL_ASSERT(m_ChassisBody != nullptr, "The car has not been created !");
 
-    if (m_Body && m_Body != car.m_Body)
-    {
-        b2World *world = m_Body->GetWorld();
+	if (m_ChassisBody != nullptr)
+	{
+		b2World *world = m_ChassisBody->GetWorld();
 
-        for (b2Joint *j : m_Joints)
-            world->DestroyJoint(j);
+		for (b2Joint* wJoint : m_WheelJoints)
+		{
+			world->DestroyJoint(wJoint);
+		}
 
-        for (b2Body *w : m_Wheels)
-            world->DestroyBody(w);
+		for (b2Body* wBody : m_WheelBodies)
+		{
+			world->DestroyBody(wBody);
+		}
 
-        world->DestroyBody(m_Body);
-    }
+		world->DestroyBody(m_ChassisBody);
 
-    m_Body = car.m_Body;
-    m_Wheels = car.m_Wheels;
-    m_Joints = car.m_Joints;
-
-    car.m_Health = 0;
-    car.m_Life = 0;
-    car.m_CarData = {};
-    car.m_Body = nullptr;
-    car.m_Wheels.clear();
-    car.m_Joints.clear();
-
-    return *this;
+		m_ChassisBody = nullptr;
+		m_WheelJoints.clear();
+		m_WheelBodies.clear();
+	}
 }
 
-void Car::init(b2World &world, CarData carData)
+void Car::Draw() const
 {
-    m_Health = 180;
-    m_Life = 0;
-    m_CarData = carData;
+	if (m_ChassisBody != nullptr)
+	{
+		// Wheels
+		for (const b2Body *wheelBody : m_WheelBodies)
+		{
+			b2Vec2 position = wheelBody->GetPosition();
+			float  rotation = wheelBody->GetAngle();
 
-    if (m_Body)
-    {
-        b2World *wrld = m_Body->GetWorld();
+			for (const b2Fixture *f = wheelBody->GetFixtureList(); f;
+			     f = f->GetNext())
+			{
+				const b2PolygonShape *shape = static_cast<const b2PolygonShape*>(f->GetShape());
 
-        for (b2Joint *j : m_Joints)
-            wrld->DestroyJoint(j);
+				float wheelRadius = shape->m_radius;
 
-        for (b2Body *w : m_Wheels)
-            wrld->DestroyBody(w);
+				glm::vec4 *colour = reinterpret_cast<glm::vec4*>(
+					const_cast<b2Body*>(wheelBody)->GetUserData().pointer
+				);
 
-        wrld->DestroyBody(m_Body);
+				glm::vec4 wheelColour;
+				if (colour)
+				{
+					wheelColour = *colour;
+				}
+				else
+				{
+					wheelColour = { 0.8f, 0.4f, 0.4f, 1.0f };
+				}
 
-        m_Joints.clear();
-        m_Wheels.clear();
-        m_Body = nullptr;
-    }
+				glm::vec4 spokeColour = wheelColour * 0.85f;
 
-    b2Vec2 vertices[8];
+				float wheelZOffset = 0.0f;
+				float spokeZOffset = 0.1f;
 
-    for (int i = 0; i < 8; i++)
-    {
-        vertices[i] = carData.Vertices[i];
-    }
+				if (IsDead())
+				{
+					wheelColour *= 0.5f;
+					spokeColour *= 0.5f;
+					wheelZOffset -= 0.05f;
+					spokeZOffset -= 0.05f;
+				}
 
-    b2PolygonShape chassisShape;
-    chassisShape.Set(vertices, 8);
+				// Wheel
+				Renderer::SubmitFilledCircle(
+					{ position.x, position.y, wheelZOffset }, wheelRadius, wheelColour
+				);
 
-    b2FixtureDef chassisFixture;
-    chassisFixture.shape = &chassisShape;
-    chassisFixture.density = carData.Density;
-    chassisFixture.restitution = carData.Restitution;
-    chassisFixture.filter.groupIndex = -1;
+				// Spokes
+				{
+					std::vector<glm::vec3> vertices = {
+						{ position.x, position.y, spokeZOffset },
+						{ wheelRadius * cos(0.00f + rotation) + position.x,
+						  wheelRadius * sin(0.00f + rotation) + position.y,
+						  spokeZOffset },
+						{ 0.5f * wheelRadius * cos(0.79f + rotation) + position.x,
+						  0.5f * wheelRadius * sin(0.79f + rotation) + position.y,
+						  spokeZOffset },
 
-    b2BodyDef chassisDef;
-    chassisDef.type = b2_dynamicBody;
-    chassisDef.position.Set(0, 0);
-    chassisDef.angle = 0;
+						{ position.x, position.y, spokeZOffset },
+						{ wheelRadius * cos(1.57f + rotation) + position.x,
+						  wheelRadius * sin(1.57f + rotation) + position.y,
+						  spokeZOffset },
+						{ 0.5f * wheelRadius * cos(2.36f + rotation) + position.x,
+						  0.5f * wheelRadius * sin(2.36f + rotation) + position.y,
+						  spokeZOffset },
 
-    m_Body = world.CreateBody(&chassisDef);
-    m_Body->CreateFixture(&chassisFixture);
+						{ position.x, position.y, spokeZOffset },
+						{ wheelRadius * cos(3.14f + rotation) + position.x,
+						  wheelRadius * sin(3.14f + rotation) + position.y,
+						  spokeZOffset },
+						{ 0.5f * wheelRadius * cos(3.93f + rotation) + position.x,
+						  0.5f * wheelRadius * sin(3.93f + rotation) + position.y,
+						  spokeZOffset },
 
-    b2CircleShape wheelShape;
+						{ position.x, position.y, spokeZOffset },
+						{ wheelRadius * cos(4.71f + rotation) + position.x,
+						  wheelRadius * sin(4.71f + rotation) + position.y,
+						  spokeZOffset },
+						{ 0.5f * wheelRadius * cos(5.50f + rotation) + position.x,
+						  0.5f * wheelRadius * sin(5.50f + rotation) + position.y,
+						  spokeZOffset }
+					};
+					Renderer::SubmitFilledPolygon(vertices, spokeColour);
+				}
+			}
+		}
 
-    b2BodyDef wheelDef;
-    wheelDef.type = b2_dynamicBody;
-    wheelDef.angle = 0;
+		// Chassis
+		{
+			b2Vec2 position = m_ChassisBody->GetPosition();
+			float  rotation = m_ChassisBody->GetAngle();
 
-    b2RevoluteJointDef jointDef;
-    jointDef.collideConnected = false;
-    jointDef.enableMotor = true;
+			for (const b2Fixture *f = m_ChassisBody->GetFixtureList(); f;
+				f = f->GetNext())
+			{
+				const b2PolygonShape *shape = static_cast<const b2PolygonShape*>(f->GetShape());
 
-    for (WheelData wheel : carData.Wheels)
-    {
-        wheelShape.m_radius = wheel.Radius;
+				const b2Vec2 *vertexArray = shape->m_vertices;
+				int32_t vertexCount = shape->m_count;
 
-        b2FixtureDef wheel_fixture;
-        wheel_fixture.shape = &wheelShape;
-        wheel_fixture.density = wheel.Density;
-        wheel_fixture.restitution = wheel.Restitution;
-        wheel_fixture.filter.groupIndex = -1;
+				glm::vec4 *colour = reinterpret_cast<glm::vec4*>(
+					m_ChassisBody->GetUserData().pointer
+				);
 
-        b2Body *wheelBody = world.CreateBody(&wheelDef);
-        wheelBody->CreateFixture(&wheel_fixture);
+				glm::vec4 bodyColour;
+				if (colour)
+				{
+					bodyColour = *colour;
+				}
+				else
+				{
+					bodyColour = { 0.8f, 0.4f, 0.4f, 1.0f };
+				}
+				
+				float zOffset = 0.2f;
 
-        m_Wheels.push_back(wheelBody);
+				if (IsDead())
+				{
+					bodyColour *= 0.5f;
+					zOffset -= 0.05f;
+				}
 
-        jointDef.bodyA = m_Body;
-        jointDef.bodyB = wheelBody;
-        jointDef.maxMotorTorque = m_Body->GetMass() / wheel.Radius * 100.0f;
-        jointDef.motorSpeed = wheel.MotorSpeed;
-        jointDef.localAnchorA = vertices[wheel.Vertex];
-        jointDef.localAnchorB.Set(0, 0);
+				std::vector<glm::vec3> vertices;
+				for (int i = 0; i < vertexCount; ++i)
+				{
+					float x =  (vertexArray[i].x * std::cos(rotation)
+					          - vertexArray[i].y * std::sin(rotation)) + position.x;
+					float y =  (vertexArray[i].x * std::sin(rotation)
+					          + vertexArray[i].y * std::cos(rotation)) + position.y;
 
-        m_Joints.push_back(world.CreateJoint(&jointDef));
-    }
+					vertices.push_back({ x, y, zOffset });
+				}
+				Renderer::SubmitFilledPolygon(vertices, bodyColour);
+			}
+		}
+	}
 }
 
-void Car::draw(Renderer &renderer) const
+void Car::Update(float delta)
 {
-    if (!m_Body)
-        return;
+	if (m_ChassisBody != nullptr)
+	{
+		if (!IsDead())
+		{
+			int ticker = static_cast<int>(100.0f * delta);
+			ticker = ticker <= 0 ? 1 : ticker;
 
-    {
-        b2Vec2 pos = m_Body->GetPosition();
-        float rot = m_Body->GetAngle();
-
-        for (b2Fixture *f = m_Body->GetFixtureList(); f; f = f->GetNext())
-        {
-            b2PolygonShape *shape = (b2PolygonShape *)f->GetShape();
-
-            if (!shape)
-                continue;
-
-            auto vertexArray = shape->m_vertices;
-            auto vertexCount = shape->m_count;
-
-            std::vector<glm::vec2> vertices;
-            glm::vec4 colour{0.8f, 0.2, 0.2f, 1.0f};
-
-            if (isDead())
-                colour *= 0.5f;
-
-            for (int i = 0; i < vertexCount; i++)
-            {
-                float x = (vertexArray[i].x * std::cos(rot) - vertexArray[i].y * std::sin(rot)) + pos.x;
-                float y = (vertexArray[i].x * std::sin(rot) + vertexArray[i].y * std::cos(rot)) + pos.y;
-
-                vertices.push_back({x, y});
-            }
-
-            renderer.submitFilledPolygon(vertices, colour);
-        }
-    }
-
-    for (auto &wheel : m_Wheels)
-    {
-        if (!wheel)
-            continue;
-
-        b2Vec2 pos = wheel->GetPosition();
-        float rot = wheel->GetAngle();
-
-        for (b2Fixture *f = wheel->GetFixtureList(); f; f = f->GetNext())
-        {
-            b2PolygonShape *shape = (b2PolygonShape *)f->GetShape();
-
-            if (!shape)
-                continue;
-
-            auto radius = shape->m_radius;
-
-            std::vector<glm::vec2> vertices;
-            glm::vec4 colour{0.8f, 0.2, 0.2f, 1.0f};
-
-            if (isDead())
-                colour *= 0.5f;
-
-            constexpr float PI = 3.14159f;
-
-            for (float a = 0.0; a <= 2.0f * PI; a += 2.0f * PI / 8.0f)
-            {
-                float x = radius * cos(a + rot) + pos.x;
-                float y = radius * sin(a + rot) + pos.y;
-
-                vertices.push_back({x, y});
-            }
-
-            renderer.submitFilledPolygon(vertices, colour);
-        }
-    }
+			if (m_ChassisBody->GetLinearVelocity().x <= CarConstants::kMinSpeed)
+			{
+				m_Health -= ticker;
+			}
+		}
+		else
+		{
+			for (b2Joint *wheelJoint : m_WheelJoints)
+			{
+				if (wheelJoint->GetType() == b2JointType::e_revoluteJoint)
+				{
+					b2RevoluteJoint *revJoint = static_cast<b2RevoluteJoint*>(wheelJoint);
+					revJoint->SetMotorSpeed(0.0f);
+				}
+			}
+		}
+	}
 }
 
-void Car::update(float delta)
+CarProto Car::RandomProto()
 {
-    if (!m_Body)
-        return;
+	CarProto carProto;
 
-    if (!isDead())
-    {
-        m_Life++;
+	for (int i = 0; i < CarConstants::kNumVertices; ++i)
+	{
+		float angle =   3.14159f / 180.0f * 360.0f
+		              * static_cast<float>(i)
+					  / static_cast<float>(CarConstants::kNumVertices);
 
-        if (m_Body->GetLinearVelocity().x <= 0.5f)
-            m_Health--;
-    }
-}
+		carProto.Vertices[i] = { Random::Float(8.0f, 15.0f) * static_cast<float>(cosf(angle)),
+								 Random::Float(8.0f, 15.0f) * static_cast<float>(sinf(angle)) };
+	}
 
-CarData Car::randomCarData()
-{
-    CarData carData;
+	carProto.Density =  (  CarConstants::kMaxChassisDensity
+	                     - CarConstants::kMinChassisDensity) * Random::Float(0.0f, 1.0f)
+	                  + CarConstants::kMinChassisDensity;
+	carProto.Friction = Random::Float(0.0f, 1.0f);
+	carProto.Restitution = Random::Float(0.0f, 1.0f);
+	
+	{
+		float r =  (carProto.Density - CarConstants::kMinChassisDensity)
+		         / (CarConstants::kMaxChassisDensity - CarConstants::kMinChassisDensity);
+		float g = carProto.Friction;
+		float b = carProto.Restitution;
+		carProto.Colour = { r, g, b, 1.0f };
+	}
 
-    for (int i = 0; i < 8; i++)
-    {
-        double angle = 3.14159f / 180.0f * 360.0f * (float)i / 8.0f;
+	int wheelCount = Random::Int(1, 5);
 
-        carData.Vertices.push_back({(Random::Float() * (15.f - 8.f) + 8.f) * (float)cos(angle),
-                                    (Random::Float() * (15.f - 8.f) + 8.f) * (float)sin(angle)});
-    }
+	BL_ASSERT(wheelCount > 0);
 
-    carData.Density = Random::Float() * (25.f - 10.f) + 10.f;
-    carData.Friction = Random::Float();
-    carData.Restitution = Random::Float();
+	for (int i = 0; i < wheelCount; i++)
+	{
+		WheelProto wheelProto;
 
-    int wheelCount = Random::UInt(1, 5);
+		wheelProto.Density =  Random::Float(CarConstants::kMinWheelDensity, CarConstants::kMaxWheelDensity);
+		wheelProto.Friction = Random::Float(0.0f, 1.0f);
+		wheelProto.Restitution = Random::Float(0.0f, 1.0f);
+		wheelProto.Radius = Random::Float(CarConstants::kMinWheelRadius, CarConstants::kMaxWheelRadius);
+		wheelProto.MotorSpeed = -Random::Float(CarConstants::kMinWheelMotorSpeed, CarConstants::kMaxWheelMotorSpeed);
+		wheelProto.Vertex = CarConstants::kNumVertices - 1 - i;
+		{
+			float r =  (wheelProto.Density - CarConstants::kMinChassisDensity)
+			         / (CarConstants::kMaxChassisDensity - CarConstants::kMinChassisDensity);
+			float g = wheelProto.Friction;
+			float b = wheelProto.Restitution;
+			wheelProto.Colour = { r, g, b, 1.0f };
+		}
 
-    for (int i = 0; i < wheelCount; i++)
-    {
-        WheelData wheelData;
+		carProto.Wheels.push_back(wheelProto);
+	}
 
-        wheelData.Density = Random::Float() * (5.f - 1.f) + 1.f;
-        wheelData.Friction = Random::Float();
-        wheelData.Restitution = Random::Float();
-        wheelData.Radius = Random::Float() * (MAX_WHEEL_RADIUS - MIN_WHEEL_RADIUS) + MIN_WHEEL_RADIUS;
-        wheelData.MotorSpeed = -Random::Float() * (MAX_WHEEL_MOTOR_SPEED - MIN_WHEEL_MOTOR_SPEED) + MIN_WHEEL_MOTOR_SPEED;
-        wheelData.Vertex = 7 - i;
-
-        carData.Wheels.push_back(wheelData);
-    }
-
-    return carData;
+	return carProto;
 }

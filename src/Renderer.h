@@ -1,72 +1,43 @@
 #pragma once
 
-#include <vector>
-
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
-struct RendererStats
-{
-	int rendererSubmissions;
-	int rendererDrawCalls;
-	int rendererVertices;
-
-	RendererStats() : rendererSubmissions(0), rendererDrawCalls(0), rendererVertices(0) {}
-};
-
-struct Vertex
-{
-	glm::vec2 position;
-	glm::vec4 colour;
-};
-
-struct BatchRendererData
-{
-	int verticesCount;
-	GLuint program;
-	GLuint vao, vbo;
-	Vertex *batchDataPtr;
-
-	BatchRendererData() : verticesCount(0), program(0), vao(0), vbo(0), batchDataPtr(nullptr) {}
-};
-
 class Renderer
 {
-public:
-	Renderer();
-	~Renderer();
-
 private:
-	// Renderer debug variables
-	RendererStats m_RendererStats;
+	static void InitCircleRenderer();
+	static void CleanupCircleRenderer();
+	static void FlushCircleVertices();
+	static void MapCircleBuffer();
+	static void UnmapCircleBuffer();
 
-	// Triangle Renderer Data
-	BatchRendererData m_TriangleRendererData;
+	static void InitTriangleRenderer();
+	static void CleanupTriangleRenderer();
+	static void FlushTriangleVertices();
+	static void MapTriangleBuffer();
+	static void UnmapTriangleBuffer();
 
-	// Line Renderer Data
-	BatchRendererData m_LineRendererData;
+	static void InitLineRenderer();
+	static void CleanupLineRenderer();
+	static void FlushLineVertices();
+	static void MapLineBuffer();
+	static void UnmapLineBuffer();
 
-	glm::mat4 m_ViewProj;
-
-private:
-	void initTriangleRenderer();
-	void cleanupTriangleRenderer();
-	void flushTriangleVertices();
-	void mapTriangleBuffer();
-	void unmapTriangleBuffer();
-
-	void initLineRenderer();
-	void cleanupLineRenderer();
-	void flushLineVertices();
-	void mapLineBuffer();
-	void unmapLineBuffer();
+	static void FlushScene();
 
 public:
-	void beginScene(const glm::mat4 &viewProj);
-	void endScene();
-	void flushScene();
+	static void Create();
+	static void Destroy();
 
-	void submitFilledPolygon(const std::vector<glm::vec2> &vertices, const glm::vec4 &colour);
+	static void Clear();
+	static void SetViewportSize(int width, int height);
 
-	RendererStats getRendererStats();
+	static void BeginScene(const glm::mat4 &viewProj);
+	static void EndScene();
+
+	static void SubmitFilledCircle(const glm::vec3& position, float radius, const glm::vec4& colour);
+	static void SubmitFilledPolygon(const std::vector<glm::vec3>& vertices, const glm::vec4& colour);
+
+	static void SubmitLine(const glm::vec3& p1, const glm::vec3& p2, const glm::vec4& colour);
 };

@@ -1,80 +1,158 @@
 #include "Application.h"
-
 #include "Log.h"
 #include "Random.h"
+#include "Renderer.h"
 
-Application::Application()
-	: m_Running(false),
-	  m_window(std::make_unique<Window>(1280, 720, "Blobolution"))
+#include <imgui.h>
+#include <backends/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_glfw.h>
+
+#include <GLFW/glfw3.h>
+#include <glad/glad.h>
+
+void Application::Run()
 {
-	m_window->setCallback(std::bind(&Application::onEvent, this, std::placeholders::_1));
-	
-	Random::Init();
+	static constexpr double kDeltaTime = 1. / 60.;
+
+	m_Running = true;
+
+	double currTime = m_Window->GetTime();
+	double accumulator = 0.;
+
+	while (m_Running)
+	{
+		double newTime = m_Window->GetTime();
+		double deltaTime = newTime - currTime;
+		currTime = newTime;
+
+		accumulator += deltaTime;
+
+		while (accumulator >= kDeltaTime)
+		{
+			for (std::unique_ptr<Layer> &layer : m_Layers)
+			{
+				layer->OnUpdate(static_cast<float>(kDeltaTime));
+			}
+
+			accumulator -= deltaTime;
+		}
+
+		{
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+
+			for (std::unique_ptr<Layer> &layer : m_Layers)
+			{
+				layer->OnDrawImGui();
+			}
+
+			float windowWidth = static_cast<float>(GetWindow().GetWidth());
+			float windowHeight = static_cast<float>(GetWindow().GetHeight());
+			
+			ImGuiIO& io = ImGui::GetIO();
+			io.DisplaySize = ImVec2(windowWidth, windowHeight);
+
+			ImGui::Render();
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		}
+
+		m_Window->OnUpdate();
+
+		Renderer::Clear();
+	}
+
+	Destroy();
 }
 
-void Application::onEvent(Event &e)
+void Application::Close()
+{
+	m_Running = false;
+}
+
+void Application::PushLayer(std::unique_ptr<Layer> layer)
+{
+	m_Layers.push_back(std::move(layer));
+}
+
+Application::Application()
+	: m_Running(false)
+	, m_Window(std::make_unique<Window>())
+{
+	Create();
+}
+
+void Application::Create()
+{
+	m_Window->Init(1280, 720, "Blobolution");
+	m_Window->SetCallback(std::bind(&Application::OnEvent, this, std::placeholders::_1));
+
+	Random::Create();
+	Renderer::Create();
+	
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+
+	// Setup Platform/Renderer bindings
+	ImGui_ImplGlfw_InitForOpenGL(GetWindow().GetGlfwWindow(), true);
+	ImGui_ImplOpenGL3_Init("#version 410");
+}
+
+void Application::Destroy()
+{
+	BL_ASSERT(!m_Running, "The application is still running !");
+
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
+	Renderer::Destroy();
+	Random::Destroy();
+}
+
+void Application::OnEvent(Event& e)
 {
 	EventDispatcher dispatcher(e);
-	dispatcher.dispatch<WindowCloseEvent>(std::bind(&Application::onWindowClose, this, std::placeholders::_1));
-	dispatcher.dispatch<WindowResizeEvent>(std::bind(&Application::onWindowResize, this, std::placeholders::_1));
+	dispatcher.dispatch<WindowCloseEvent>(std::bind(&Application::OnWindowClose, this, std::placeholders::_1));
+	dispatcher.dispatch<WindowResizeEvent>(std::bind(&Application::OnWindowResize, this, std::placeholders::_1));
+
+	// ImGui events
+	{
+		ImGuiIO& io = ImGui::GetIO();
+	
+		e.Handled |=   (e.GetType() == EventType::MouseButtonPressed
+		            ||  e.GetType() == EventType::MouseButtonReleased
+		            ||  e.GetType() == EventType::MouseMoved
+		            ||  e.GetType() == EventType::MouseScrolled) & io.WantCaptureMouse;
+		
+		e.Handled |=   (e.GetType() == EventType::KeyPressed
+		            ||  e.GetType() == EventType::KeyReleased
+		            ||  e.GetType() == EventType::KeyRepeat
+		            ||  e.GetType() == EventType::KeyTyped) & io.WantCaptureKeyboard;
+	}
 
 	for (auto it = m_Layers.rbegin(); it != m_Layers.rend(); ++it)
 	{
 		if (e.Handled)
 			break;
 
-		(*it)->onEvent(e);
+		(*it)->OnEvent(e);
 	}
 }
 
-void Application::run()
+bool Application::OnWindowClose(WindowCloseEvent &e)
 {
-	BL_LOG_INFO("Run!");
-
-	m_Running = true;
-
-	double delta = 0, last = 0, current = 0;
-
-	while (m_Running)
-	{
-		current = glfwGetTime();
-		delta = current - last;
-		last = current;
-
-		for (auto &layer : m_Layers)
-			layer->onUpdate((float)delta);
-
-		m_window->onUpdate();
-	}
+	Close();
+	return true;
 }
 
-void Application::shutdown()
+bool Application::OnWindowResize(WindowResizeEvent &e)
 {
-	BL_LOG_INFO("Shutdown!");
-
-	m_Running = false;
-}
-
-void Application::pushLayer(std::shared_ptr<Layer> layer)
-{
-	BL_LOG_INFO("Pushing \"", layer->getName(), "\" to the layer stack.");
-
-	m_Layers.push_back(layer);
-}
-
-bool Application::onWindowClose(WindowCloseEvent &e)
-{
-	BL_LOG_INFO("Window closed!");
-
-	shutdown();
-
-	return false;
-}
-
-bool Application::onWindowResize(WindowResizeEvent &e)
-{
-	BL_LOG_INFO("Window resized to ", e.Width, " x ", e.Height);
-
-	glViewport(0, 0, e.Width, e.Height);
+	Renderer::SetViewportSize(e.Width, e.Height);
 	return false;
 }

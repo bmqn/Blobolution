@@ -7,35 +7,26 @@
 #include <glm/glm.hpp>
 #include <box2d/box2d.h>
 
-#include <vector>
-#include <memory>
-
-
 class Generation
 {
 
 private:
-	using WorldPtr		= std::unique_ptr<b2World>;
-	using PlatformPtr 	= std::unique_ptr<Platform>;
+	std::unique_ptr<b2World>  m_World;
 
-	WorldPtr m_World;
-	PlatformPtr m_Platform;
-	std::vector<Car> m_Cars;
-
-	bool m_Simulating;
-
-private:
-	void nextGeneration();
+	std::unique_ptr<Platform> m_Platform;
+	std::vector<Car>          m_Cars;
 
 public:
-	Generation(int cars);
+	Generation();
 	~Generation();
 
-	void init();
-	void beginSimulating();
+	void Create(int numCars);
+	void Update(float delta);
+	void Draw() const;
+	void DrawImGui() const;
 
-	glm::vec3 getPositionOfBestCar();
+	const Car &GetBestCar() const;
 
-	void update(float delta);
-	void draw(Renderer &renderer);
+private:
+	void NextGeneration();
 };

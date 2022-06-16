@@ -21,16 +21,21 @@ private:
 	WindowData m_Data;
 
 public:
-	Window(int width, int height, std::string title);
+	Window() = default;
 	~Window();
 
-	int getWidth() const { return m_Data.Width; }
-	int getHeight() const { return m_Data.Height; }
+	void Init(int width, int height, const std::string& title);
+	void OnUpdate();
+	void Destroy();
 
-	void setCallback(const std::function<void(Event &e)> &callback) { m_Data.Callback = callback; }
-	void setTitle(std::string title) { glfwSetWindowTitle(m_Window, title.c_str()); }
-	void setVSync(bool state) { glfwSwapInterval(state ? 1 : 0); }
+	int GetWidth() const { return m_Data.Width; }
+	int GetHeight() const { return m_Data.Height; }
 
-	void onUpdate();
-	void shutdown();
+	void SetCallback(const std::function<void(Event &e)> &callback) { m_Data.Callback = callback; }
+	void SetTitle(const std::string& title) { glfwSetWindowTitle(m_Window, title.c_str()); }
+	void SetSwapInterval(bool state) { glfwSwapInterval(state ? 1 : 0); }
+
+	double GetTime() const { return glfwGetTime(); }
+
+	inline GLFWwindow* GetGlfwWindow() const { return m_Window; }
 };

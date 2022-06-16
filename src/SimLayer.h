@@ -8,26 +8,24 @@
 
 class SimLayer : public Layer
 {
+public:
+	SimLayer();
+
+	virtual void OnUpdate(float delta) override;
+	virtual void OnDrawImGui() override;
+	virtual void OnEvent(Event& e) override;
 
 private:
-	Renderer m_Renderer;
+	bool OnMouseMoved(MouseMovedEvent& e);
+	bool OnMousePressed(MousePressedEvent& e);
+	bool OnMouseReleased(MouseReleasedEvent& e);
+	bool OnMouseScrolled(MouseScrolledEvent& e);
+	bool OnKeyPressed(KeyPressedEvent& e);
+
+private:
 	Generation m_Generation;
 
 	glm::vec3 m_CamPosition;
 	float m_CamScale, m_TimeScale;
-	bool m_MousePressed, m_FollowCam;
-
-private:
-	bool onMouseMoved(MouseMovedEvent &e);
-	bool onMousePressed(MousePressedEvent &e);
-	bool onMouseScrolled(MouseScrolledEvent &e);
-	bool onKeyPressed(KeyPressedEvent &e);
-
-public:
-	SimLayer();
-	~SimLayer();
-
-	virtual void onUpdate(float delta) override;
-
-	virtual void onEvent(Event &e) override;
+	bool m_MousePressed, m_FollowCam, m_Paused;
 };

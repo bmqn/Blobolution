@@ -1,14 +1,12 @@
 #include "Application.h"
 #include "SimLayer.h"
 
-#include <memory>
-
 int main()
 {
-	auto& app = Application::get();
+	auto& app = Application::Get();
 	
-	app.pushLayer(std::make_shared<SimLayer>());
-	app.run();
+	app.PushLayer(std::make_unique<SimLayer>());
+	app.Run();
 
 	return 0;
 }

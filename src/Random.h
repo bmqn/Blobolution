@@ -1,52 +1,76 @@
 #pragma once
 
-#include "Assert.h"
-
-#include <random>
-
 class Random
 {
+private:
+	using DistType = std::mt19937::result_type;
+	
+	static constexpr DistType kMaxDistTypeValue = std::numeric_limits<DistType>::max();
+
 public:
-    static void Init()
-    {
-        s_RandomGenerator.seed(std::random_device()());
-    }
+	static void Create()
+	{
+		s_RandomGenerator.seed(std::random_device()());
+	}
 
-    static float Float()
-    {
-        return ((float)s_Distribution(s_RandomGenerator) / (float)std::numeric_limits<std::mt19937::result_type>::max());
-    }
+	static void Destroy() {}
 
-    static bool Bool()
-    {
-        return Float() < 0.5;
-    }
 
-    static unsigned int UInt()
-    {
-        return (unsigned int)(s_Distribution(s_RandomGenerator));
-    }
 
-    static unsigned int UInt(unsigned int min, unsigned int max)
-    {
-        BL_ASSERT(min < max, "The minimum (", min, ") should not be smaller than the maximum (", max, ").");
+	static bool Bool()
+	{
+		return Float<float>() < 0.5f;
+	}
 
-        return min + (((unsigned int)s_Distribution(s_RandomGenerator)) % (max - min));
-    }
+	template<
+		typename I,
+		std::enable_if_t<std::is_integral_v<I>, bool> = true
+	>
+	static I Int(I min, I max)
+	{
+		static constexpr I kMaxValue = std::numeric_limits<I>::max();
 
-    static int Int()
-    {
-        return (int)(s_Distribution(s_RandomGenerator));
-    }
+		I retVal;
 
-    static int Int(int min, int max)
-    {
-        BL_ASSERT(min < max, "The minimum (", min, ") should not be smaller than the maximum (", max, ").");
+		if (min >= max)
+		{
+			retVal = min;
+		}
+		else
+		{
+			retVal = min + (static_cast<I>(
+				GetFromDist() % kMaxValue) % ((max + 1) - min)
+			);
+		}
 
-        return min + (((int)s_Distribution(s_RandomGenerator)) % (max - min));
-    }
+		return retVal;
+	}
+
+	template<
+		typename F,
+		std::enable_if_t<std::is_floating_point_v<F>, bool> = true
+	>
+	static F Float(F min = 0, F max = 1)
+	{
+		F retVal;
+
+		if (min >= max)
+		{
+			retVal = min;
+		}
+		else
+		{
+			retVal = min + ( static_cast<F>(GetFromDist())
+			               / static_cast<F>(kMaxDistTypeValue)) * (max - min);
+		}
+
+		return retVal;
+	}
 
 private:
-    static std::mt19937 s_RandomGenerator;
-    static std::uniform_int_distribution<std::mt19937::result_type> s_Distribution;
+	static DistType GetFromDist() { return s_Distribution(s_RandomGenerator); }
+
+private:
+	static std::mt19937 s_RandomGenerator;
+	static std::uniform_int_distribution<DistType> s_Distribution;
 };

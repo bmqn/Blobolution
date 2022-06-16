@@ -1,18 +1,13 @@
 #include "Generation.h"
-
-#include "Log.h"
 #include "Random.h"
-
-#include <iostream>
-#include <map>
-#include <random>
-#include <algorithm>
-#include <iterator>
+#include "Log.h"
 
 #include <box2d/box2d.h>
 
-template <typename T>
-static T &mutate(T &value, T amount, T min, T max)
+#include <imgui.h>
+
+template <typename T, typename U>
+static T& mutate(T &value, U amount, T min, T max)
 {
 	value += amount;
 
@@ -25,352 +20,536 @@ static T &mutate(T &value, T amount, T min, T max)
 }
 
 template <typename T>
-static T &offset(T &value, T amount)
+static T& offset(T &value, T amount)
 {
 	value += amount;
 
 	return value;
 }
 
-Generation::Generation(int cars)
-	: m_Simulating(false)
+Generation::Generation()
+	: m_World(std::make_unique<b2World>(b2Vec2{ 0.0f, -10.0f }))
+	, m_Platform(nullptr)
+	, m_Cars(0)
 {
-	m_World = std::make_unique<b2World>(b2Vec2{0.0f, -10.0f});
-	m_Platform = std::make_unique<Platform>();
-	m_Cars.resize(cars);
-
-	// m_Draw.SetFlags( b2Draw::e_shapeBit );
-	// m_World->SetDebugDraw(&m_Draw);
 }
 
 Generation::~Generation()
 {
-}
-
-void Generation::init()
-{
-	m_Platform->init(*m_World, 500);
+	if (m_Platform)
+	{
+		m_Platform->Destory();
+	}
 
 	for (auto &car : m_Cars)
 	{
-		car.init(*m_World, Car::randomCarData());
+		car.Destory();
 	}
 }
 
-void Generation::beginSimulating()
+void Generation::Create(int numCars)
 {
-	if (m_Simulating)
+	m_Platform = std::make_unique<Platform>();
+	m_Platform->Create(*m_World, 1024);
+	
+	m_Cars.resize(numCars);
+	for (auto &car : m_Cars)
 	{
-		BL_LOG_WARN("Already simulating a generation.");
-		return;
+		car.Create(*m_World, Car::RandomProto());
 	}
-
-	m_Simulating = true;
 }
 
-void Generation::nextGeneration()
+void Generation::Update(float delta)
 {
-	m_Simulating = false;
+	m_World->Step(delta, 6, 2);
 
-	int numCars = m_Cars.size();
-	int numParents = 8;
-	int numVertices = 8;
+	int deadCount = 0;
 
-	BL_ASSERT(numCars > 0, "We must have at least one car to perform natural selection.");
-
-	// Sort by fitness
-
-	std::sort(m_Cars.begin(), m_Cars.end(), [](const Car &car1, const Car &car2)
-			  { return car1.getFitness() < car2.getFitness(); });
-
-	// Select parents
-
-	BL_LOG_INFO("Selecting parents!");
-
-	std::vector<int> cumulativeFitness;
-
-	cumulativeFitness.push_back(m_Cars[0].getFitness());
-
-	for (int i = 1; i < numCars; i++)
+	for (auto &car : m_Cars)
 	{
-		cumulativeFitness.push_back(cumulativeFitness[i - 1] + m_Cars[i].getFitness());
+		car.Update(delta);
+
+		if (car.IsDead())
+			deadCount++;
 	}
 
-	int totalFitness = cumulativeFitness.back();
+	if (deadCount == m_Cars.size())
+	{
+		NextGeneration();
+	}
+}
 
-	std::vector<CarData> parentsCarData;
+void Generation::Draw() const
+{
+	if (m_Platform)
+	{
+		m_Platform->Draw();
+	}
+
+	for (const auto& car : m_Cars)
+	{
+		car.Draw();
+	}
+}
+
+void Generation::DrawImGui() const
+{
+	ImGui::Begin("Generation");
+	
+	if (ImGui::CollapsingHeader("Best Car"))
+	{
+		ImGui::Indent();
+
+		const Car& car = GetBestCar();
+		const CarProto& proto = car.GetProto();
+	
+		ImGui::Text("Car Id: %u", car.GetCarId());
+		ImGui::Separator();
+		ImGui::Text("Health: %u", car.GetHealth());
+		ImGui::Text("Fitness: %u", car.GetFitness());
+		ImGui::Text("Velocity: (%0.3f, %0.3f)", car.GetVelocity().x, car.GetVelocity().y);
+		ImGui::Text("Position: (%0.3f, %0.3f)", car.GetPosition().x, car.GetPosition().y);
+
+		if (ImGui::CollapsingHeader("Wheels"))
+		{
+			int wheelNum = 1;
+			for (const auto& wheel : proto.Wheels)
+			{
+				ImGui::Indent();
+
+				char wheelNStr[32];
+				std::sprintf(wheelNStr, "Wheel %d", wheelNum++);
+
+				if (ImGui::CollapsingHeader(wheelNStr))
+				{
+					ImGui::Indent();
+					ImGui::Text("Motor Speed: %0.3f", wheel.MotorSpeed);
+					ImGui::Text("Radius: %0.3f", wheel.Radius);
+					ImGui::Text("Density: %0.3f", wheel.Density);
+					ImGui::Text("Friction: %0.3f", wheel.Friction);
+					ImGui::Text("Restitution: %0.3f", wheel.Restitution);
+					ImGui::Unindent();
+				}
+
+				ImGui::Unindent();
+			}
+		}
+
+		if (ImGui::CollapsingHeader("Chassis"))
+		{
+			ImGui::Indent();
+			ImGui::Text("Density: %0.3f", proto.Density);
+			ImGui::Text("Friction: %0.3f", proto.Friction);
+			ImGui::Text("Restitution: %0.3f", proto.Restitution);
+			ImGui::Unindent();
+		}
+
+		ImGui::Unindent();
+	}
+	
+	ImGui::End();
+}
+
+const Car &Generation::GetBestCar() const
+{
+	const Car *bestCar = &m_Cars.front();
+	glm::vec3 bestPosition = { 0.0, 0.0, 0.0f };
+
+	for (const auto& car : m_Cars)
+	{
+		b2Vec2 pos = car.GetPosition();
+
+		if (pos.x > bestPosition.x && !car.IsDead())
+		{
+			bestPosition.x = pos.x;
+			bestPosition.y = pos.y;
+			bestCar = &car;
+		}
+	}
+
+	return *bestCar;
+}
+
+void Generation::NextGeneration()
+{
+	BL_LOG("Starting to create next generation");
+
+	using RatioRange       = std::pair<double, double>;
+	using CarProtoRoulette = std::vector<std::pair<RatioRange, CarProto>>;
+	using ProtoList        = std::vector<CarProto>;
+
+	BL_LOG("Ranking parents");
+
+	CarProtoRoulette carProtosRoulette;
+	ProtoList        parentProtos;
+
+	size_t numCars    = m_Cars.size();
+	size_t numParents = numCars / 2;
+
+	float totalFitness = static_cast<float>(
+		std::accumulate(m_Cars.begin(), m_Cars.end(), 0_zu, [](size_t i, const Car &car)
+		{
+			return i + car.GetFitness();
+		})
+	);
+	
+	{
+		float cumlRatio = 0.;
+
+		for (auto curr = m_Cars.cbegin(); curr != m_Cars.cend(); ++curr)
+		{
+			float ratio = static_cast<float>(curr->GetFitness()) / totalFitness;
+			cumlRatio += ratio;
+
+			carProtosRoulette.push_back({ {cumlRatio - ratio, cumlRatio}, curr->GetProto() });
+		}
+	}
 
 	for (int i = 0; i < numParents; i++)
 	{
-		int fitness = totalFitness > 0 ? Random::UInt(0, totalFitness) : 0;
+		float ratio = Random::Float(0.0f, 1.0f);
 
-		auto upper = std::upper_bound(cumulativeFitness.begin(), cumulativeFitness.end(), fitness);
-		int index = upper == cumulativeFitness.end() ? 0 : std::distance(cumulativeFitness.begin(), upper);
-
-		BL_ASSERT(index >= 0 && index < numCars, "Invalid index (", index, ") selected for parent!");
-
-		parentsCarData.push_back(m_Cars[index].getCarData());
+		for (const auto& segment : carProtosRoulette)
+		{
+			if (ratio >= segment.first.first && ratio <= segment.first.second)
+			{
+				parentProtos.push_back(segment.second);
+				break;
+			}
+		}
+		
 	}
 
-	BL_LOG_INFO("Crossing parents!");
+	BL_LOG("Crossing parents");
 
-	// Cross parents
-
-	for (int i = 0; i < numCars; i++)
+	for (auto& car : m_Cars)
 	{
-		CarData parentCarData1 = parentsCarData[Random::UInt(0, numParents)];
-		CarData parentCarData2 = parentsCarData[Random::UInt(0, numParents)];
-		CarData newCarData;
+		CarProto newCarData;
+
+		const CarProto& parentCarData1 = parentProtos[Random::Int(0_zu, numParents - 1)];
+		const CarProto& parentCarData2 = parentProtos[Random::Int(0_zu, numParents - 1)];
 
 		// Density
 		{
-			if (Random::Bool())
-				newCarData.Density = parentCarData1.Density;
-			else
-				newCarData.Density = parentCarData2.Density;
-		}
+			float mixRatio =   std::log(Random::Float(0.0f, 1000.0f) + 1.0f)
+			                 / std::log(1000.0f + 1.0f);
 
-		if (Random::Bool())
-			mutate(newCarData.Density, Random::Float() / 5.0f, 0.1f, 1.0f);
+			if (Random::Bool())
+			{
+				mixRatio = 1.0f - mixRatio;
+			}
+
+			newCarData.Density =   parentCarData1.Density * mixRatio
+			                     + parentCarData2.Density * (1.0f - mixRatio);
+
+			if (Random::Bool())
+			{
+				offset(newCarData.Density, Random::Float(0.5f, 2.0f));
+			}
+		}
 
 		// Friction
 		{
-			if (Random::Bool())
-				newCarData.Friction = parentCarData1.Friction;
-			else
-				newCarData.Friction = parentCarData2.Friction;
-		}
+			float mixRatio =   std::log(Random::Float(0.0f, 1000.0f) + 1.0f)
+			                 / std::log(1000.0f + 1.0f);
 
-		if (Random::Bool())
-			mutate(newCarData.Friction, Random::Float() / 5.0f, 0.1f, 1.0f);
+			if (Random::Bool())
+			{
+				mixRatio = 1.0f - mixRatio;
+			}
+
+			newCarData.Friction =   parentCarData1.Friction * mixRatio
+			                      + parentCarData2.Friction * (1.0f - mixRatio);
+
+			if (Random::Bool())
+			{
+				mutate(newCarData.Friction, Random::Float(0.05f, 0.3f), 0.1f, 1.0f);
+			}
+		}
 
 		// Restitution
 		{
+			float mixRatio =   std::log(Random::Float(0.0f, 1000.0f) + 1.0f)
+			                 / std::log(1000.0f + 1.0f);
+
 			if (Random::Bool())
-				newCarData.Restitution = parentCarData1.Restitution;
-			else
-				newCarData.Restitution = parentCarData2.Restitution;
+			{
+				mixRatio = 1.0f - mixRatio;
+			}
+
+			newCarData.Restitution =   parentCarData1.Restitution * mixRatio
+			                         + parentCarData2.Restitution * (1.0f - mixRatio);
+
+			if (Random::Bool())
+			{
+				mutate(newCarData.Restitution, Random::Float(0.5f, 2.0f), 0.1f, 1.0f);
+			}
 		}
 
-		if (Random::Bool())
-			mutate(newCarData.Restitution, Random::Float() / 5.0f, 0.1f, 1.0f);
+		// Colour
+		{
+			float r =  (newCarData.Density               - CarConstants::kMinChassisDensity)
+			         / (CarConstants::kMaxChassisDensity - CarConstants::kMinChassisDensity);
+			float g = newCarData.Friction;
+			float b = newCarData.Restitution;
+			newCarData.Colour = {r, g, b, 1.0f };
+		}
 
 		// Vertices
 		{
-			for (int j = 0; j < numVertices; j++)
+			for (int j = 0; j < CarConstants::kNumVertices; j++)
 			{
 				if (Random::Bool())
-					newCarData.Vertices.push_back(parentCarData1.Vertices[j]);
+				{
+					newCarData.Vertices[j] = parentCarData1.Vertices[j];
+				}
 				else
-					newCarData.Vertices.push_back(parentCarData2.Vertices[j]);
+				{
+					newCarData.Vertices[j] = parentCarData2.Vertices[j];
+				}
 
 				if (Random::Bool())
-					offset(newCarData.Vertices[j].x, Random::Float() / 10.0f);
-
-				if (Random::Bool())
-					offset(newCarData.Vertices[j].y, Random::Float() / 10.0f);
+				{
+					offset(newCarData.Vertices[j].x, Random::Float(0.5f, 2.0f));
+					offset(newCarData.Vertices[j].y, Random::Float(0.5f, 2.0f));
+				}
 			}
 		}
 
 		// Wheels
 		{
-			int numWheels = std::min(parentCarData1.Wheels.size(), parentCarData2.Wheels.size());
+			newCarData.Wheels.resize(Random::Bool() ? parentCarData1.Wheels.size() :
+			                                          parentCarData2.Wheels.size()
+			);
 
-			for (int j = 0; j < numWheels; j++)
+			size_t maxIndex = std::min(parentCarData1.Wheels.size(),
+			                           parentCarData2.Wheels.size()
+			);
+			maxIndex = maxIndex == 0 ? 0 : maxIndex - 1;
+
+			BL_ASSERT(newCarData.Wheels.size() > 0, "A car has no wheels...");
+
+			size_t i = 0;
+			for (auto it = newCarData.Wheels.begin(); it != newCarData.Wheels.end(); )
 			{
-				WheelData newWheelData;
-
-				// Density
 				{
-					if (Random::Bool())
-						newWheelData.Density = parentCarData1.Wheels[j].Density;
-					else
-						newWheelData.Density = parentCarData2.Wheels[j].Density;
+					auto& wheel = *it;
 
-					if (Random::Bool())
-						mutate(newWheelData.Density, Random::Float() / 5.0f, 0.1f, 1.0f);
+					// Density
+					{
+						if (   i >= parentCarData1.Wheels.size()
+						    || i >= parentCarData2.Wheels.size())
+						{
+							if (Random::Bool())
+							{
+								wheel.Density = parentCarData1.Wheels[Random::Int(0_zu, maxIndex)].Density;
+							}
+							else
+							{
+								wheel.Density = parentCarData2.Wheels[Random::Int(0_zu, maxIndex)].Density;
+							}
+						}
+						else
+						{
+							float mixRatio =   std::log(Random::Float(0.0f, 1000.0f) + 1.0f)
+							                 / std::log(1000.0f + 1.0f);
+
+							if (Random::Bool())
+							{
+								mixRatio = 1.0f - mixRatio;
+							}
+
+							wheel.Density =   parentCarData1.Wheels[i].Density * mixRatio
+							                + parentCarData2.Wheels[i].Density * (1.0f - mixRatio);
+						}
+
+						if (Random::Bool())
+						{
+							offset(wheel.Density, Random::Float(0.5f, 2.0f));
+						}
+					}
+
+					// Friction
+					{
+						if (   i >= parentCarData1.Wheels.size()
+						    || i >= parentCarData2.Wheels.size())
+						{
+							if (Random::Bool())
+							{
+								wheel.Friction = parentCarData1.Wheels[Random::Int(0_zu, maxIndex)].Friction;
+							}
+							else
+							{
+								wheel.Friction = parentCarData2.Wheels[Random::Int(0_zu, maxIndex)].Friction;
+							}
+						}
+						else
+						{
+							float mixRatio =   std::log(Random::Float(0.0f, 1000.0f) + 1.0f)
+							                 / std::log(1000.0f + 1.0f);
+
+							if (Random::Bool())
+							{
+								mixRatio = 1.0f - mixRatio;
+							}
+
+							wheel.Friction =   parentCarData1.Wheels[i].Friction * mixRatio
+							                 + parentCarData2.Wheels[i].Friction * (1.0f - mixRatio);
+						}
+
+						if (Random::Bool())
+						{
+							mutate(wheel.Friction, Random::Float(0.5f, 2.0f), 0.1f, 1.0f);
+						}
+					}
+
+					// Restitution
+					{
+						if (   i >= parentCarData1.Wheels.size()
+						    || i >= parentCarData2.Wheels.size())
+						{
+							if (Random::Bool())
+							{
+								wheel.Restitution = parentCarData1.Wheels[Random::Int(0_zu, maxIndex)].Restitution;
+							}
+							else
+							{
+								wheel.Restitution = parentCarData2.Wheels[Random::Int(0_zu, maxIndex)].Restitution;
+							}
+						}
+						else
+						{
+							float mixRatio =   std::log(Random::Float(0.0f, 1000.0f) + 1.0f)
+							                 / std::log(1000.0f + 1.0f);
+
+							if (Random::Bool())
+							{
+								mixRatio = 1.0f - mixRatio;
+							}
+
+							wheel.Restitution =   parentCarData1.Wheels[i].Restitution * mixRatio
+							                    + parentCarData2.Wheels[i].Restitution * (1.0f - mixRatio);
+						}
+
+						if (Random::Bool())
+						{
+							mutate(wheel.Restitution, Random::Float(0.5f, 2.0f), 0.1f, 1.0f);
+						}
+					}
+
+					// Radius
+					{
+						if (   i >= parentCarData1.Wheels.size()
+						    || i >= parentCarData2.Wheels.size())
+						{
+							if (Random::Bool())
+							{
+								wheel.Radius = parentCarData1.Wheels[Random::Int(0_zu, maxIndex)].Radius;
+							}
+							else
+							{
+								wheel.Radius = parentCarData2.Wheels[Random::Int(0_zu, maxIndex)].Radius;
+							}
+						}
+						else
+						{
+							float mixRatio =   std::log(Random::Float(0.0f, 1000.0f) + 1.0f)
+							                 / std::log(1000.0f + 1.0f);
+
+							if (Random::Bool())
+							{
+								mixRatio = 1.0f - mixRatio;
+							}
+
+							wheel.Radius =   parentCarData1.Wheels[i].Radius * mixRatio
+							               + parentCarData2.Wheels[i].Radius * (1.0f - mixRatio);
+						}
+
+						if (Random::Bool())
+						{
+							mutate(
+								wheel.Radius, Random::Float(0.5f, 2.0f),
+								CarConstants::kMinWheelRadius, CarConstants::kMaxWheelRadius
+							);
+						}
+					}
+
+					// Motor Speed
+					{
+						if (   i >= parentCarData1.Wheels.size()
+						    || i >= parentCarData2.Wheels.size())
+						{
+							if (Random::Bool())
+							{
+								wheel.MotorSpeed = parentCarData1.Wheels[Random::Int(0_zu, maxIndex)].MotorSpeed;
+							}
+							else
+							{
+								wheel.MotorSpeed = parentCarData2.Wheels[Random::Int(0_zu, maxIndex)].MotorSpeed;
+							}
+						}
+						else
+						{
+							float mixRatio =   std::log(Random::Float(0.0f, 1000.0f) + 1.0f)
+							                 / std::log(1000.0f + 1.0f);
+
+							if (Random::Bool())
+							{
+								mixRatio = 1.0f - mixRatio;
+							}
+
+							wheel.MotorSpeed =   parentCarData1.Wheels[i].MotorSpeed * mixRatio
+							                   + parentCarData2.Wheels[i].MotorSpeed * (1.0f - mixRatio);
+						}
+
+						if (Random::Bool())
+						{
+							mutate(
+								wheel.MotorSpeed, Random::Float(0.5f, 2.0f),
+								-CarConstants::kMaxWheelMotorSpeed, -CarConstants::kMinWheelMotorSpeed
+							);
+						}
+					}
+
+					// Vertex
+					{
+						if (Random::Bool())
+						{
+							wheel.Vertex = parentCarData1.Wheels[Random::Int(0_zu, maxIndex)].Vertex;
+						}
+						else
+						{
+							wheel.Vertex = parentCarData2.Wheels[Random::Int(0_zu, maxIndex)].Vertex;
+						}
+
+						if (Random::Bool())
+						{
+							mutate(
+								wheel.Vertex, Random::Int(-1, 1), 0_zu,
+								CarConstants::kNumVertices - 1_zu
+							);
+						}
+					}
+
+					// Colour
+					{
+						float r =  (wheel.Density                  - CarConstants::kMinWheelDensity)
+						         / (CarConstants::kMaxWheelDensity - CarConstants::kMinWheelDensity);
+						float g = wheel.Friction;
+						float b = wheel.Restitution;
+						wheel.Colour = {r, g, b, 1.0f };
+					}
+
+					++it;
 				}
 
-				// Friction
-				{
-					if (Random::Bool())
-						newWheelData.Friction = parentCarData1.Wheels[j].Friction;
-					else
-						newWheelData.Friction = parentCarData2.Wheels[j].Friction;
-
-					if (Random::Bool())
-						mutate(newWheelData.Friction, Random::Float() / 5.0f, 0.1f, 1.0f);
-				}
-
-				// Restitution
-				{
-					if (Random::Bool())
-						newWheelData.Restitution = parentCarData1.Wheels[j].Restitution;
-					else
-						newWheelData.Restitution = parentCarData2.Wheels[j].Restitution;
-
-					if (Random::Bool())
-						mutate(newWheelData.Restitution, Random::Float() / 5.0f, 0.1f, 1.0f);
-				}
-
-				// Radius
-				{
-					if (Random::Bool())
-						newWheelData.Radius = parentCarData1.Wheels[j].Radius;
-					else
-						newWheelData.Radius = parentCarData2.Wheels[j].Radius;
-
-					if (Random::Bool())
-						mutate(newWheelData.Radius, Random::Float() / 5.0f, MIN_WHEEL_RADIUS, MAX_WHEEL_RADIUS);
-				}
-
-				// Motor Speed
-				{
-					if (Random::Bool())
-						newWheelData.MotorSpeed = parentCarData1.Wheels[j].MotorSpeed;
-					else
-						newWheelData.MotorSpeed = parentCarData2.Wheels[j].MotorSpeed;
-
-					if (Random::Bool())
-						mutate(newWheelData.MotorSpeed, Random::Float(), -MAX_WHEEL_MOTOR_SPEED, -MIN_WHEEL_MOTOR_SPEED);
-				}
-
-				// Vertex
-				{
-					if (Random::Bool())
-						newWheelData.Vertex = parentCarData1.Wheels[j].Vertex;
-					else
-						newWheelData.Vertex = parentCarData2.Wheels[j].Vertex;
-
-					if (Random::Bool())
-						mutate(newWheelData.Vertex, Random::Int(-1, 1), 0, numVertices - 1);
-				}
-
-				newCarData.Wheels.push_back(newWheelData);
+				++i;
 			}
 
-			if (Random::Bool())
-			{
-				int extraWheels = Random::Int(0, 2);
-
-				for (int j = 0; j < extraWheels; j++)
-				{
-					WheelData wheelData;
-
-					wheelData.Density = Random::Float() * (5.f - 1.f) + 1.f;
-					wheelData.Friction = Random::Float();
-					wheelData.Restitution = Random::Float();
-					wheelData.Radius = Random::Float() * (MAX_WHEEL_RADIUS - MIN_WHEEL_RADIUS) + MIN_WHEEL_RADIUS;
-					wheelData.MotorSpeed = -Random::Float() * (MAX_WHEEL_MOTOR_SPEED - MIN_WHEEL_MOTOR_SPEED) + MIN_WHEEL_MOTOR_SPEED;
-					wheelData.Vertex = 7 - i;
-
-					newCarData.Wheels.push_back(wheelData);
-				}
-			}
-
-			m_Cars[i].init(*m_World, newCarData);
-		}
-
-		m_Simulating = true;
-	}
-}
-
-glm::vec3 Generation::getPositionOfBestCar()
-{
-	if (m_Cars.empty())
-	{
-		return {0.0f, 0.0f, 0.0f};
-	}
-
-	b2Vec2 pos = m_Cars.front().getPosition();
-
-	glm::vec3 best = {pos.x, pos.y, 0.0f};
-
-	for (const auto &car : m_Cars)
-	{
-		pos = car.getPosition();
-
-		if (pos.x > best.x && !car.isDead())
-		{
-			best.x = pos.x;
-			best.y = pos.y;
+			car.Destory();
+			car.Create(*m_World, newCarData);
 		}
 	}
 
-	return best;
-}
-
-// void Generation::drawImGui()
-// {
-// 	ImGui::Begin("Generation");
-
-// 	// ImGui::SliderFloat("Time Scale", &mTimeScale, 0.1f, 20.0f);
-
-// 	ImGui::Spacing();
-
-// 	if (!ImGui::CollapsingHeader("Camera"))
-// 	{
-// 		ImGui::BeginChild("CameraControls", {0, 100}, true, ImGuiWindowFlags_AlwaysAutoResize);
-
-// 		// ImGui::DragFloat2("Position", &mCamPos.x, 0.5f);
-// 		// ImGui::DragFloat("Zoom", &mCamZoom, 0.0001f, 0.0001f, 0.5f);
-
-// 		ImGui::EndChild();
-// 	}
-
-// 	/*if (!ImGui::CollapsingHeader("Current Car") && mCurrentCar)
-// 	{
-// 			CarData best_car_data = mCurrentCar->get_car_data();
-
-// 			ImGui::Text("--- Wheels: %d\n", best_car_data.wheels.size());
-// 			for (int i = 0; i < best_car_data.wheels.size(); i++)
-// 			{
-// 				ImGui::Text("  --- Wheel %d ---\n", i + 1);
-// 				ImGui::Text("    --- Motor Speed: %0.3f\n", best_car_data.wheels[i].motorSpeed);
-// 				ImGui::Text("    --- Radius: %0.3f\n", best_car_data.wheels[i].radius);
-// 				ImGui::Text("    --- Density: %0.3f\n", best_car_data.wheels[i].wheelDensity);
-// 				ImGui::Text("    --- Friction: %0.3f\n", best_car_data.wheels[i].wheelFriction);
-// 				ImGui::Text("    --- Restitution: %0.3f\n", best_car_data.wheels[i].wheelRestitution);
-// 			}
-// 			ImGui::Text("--- Chassis Density: %0.3f\n", best_car_data.chassisDensity);
-// 			ImGui::Text("--- Chassis Friction: %0.3f\n", best_car_data.chassisFriction);
-// 			ImGui::Text("--- Chassis Restitution: %0.3f\n", best_car_data.chassisRestitution);
-// 	}*/
-
-// 	ImGui::End();
-// }
-
-void Generation::update(float delta)
-{
-	static float timer = 0.0f;
-
-	if (m_Simulating)
-	{
-		m_World->Step(delta, 8, 6);
-
-		int deadCount = 0;
-
-		for (auto &car : m_Cars)
-		{
-			car.update(delta);
-
-			if (car.isDead())
-				deadCount++;
-		}
-
-		if (deadCount == m_Cars.size())
-			nextGeneration();
-	}
-
-	timer += delta;
-}
-
-void Generation::draw(Renderer &renderer)
-{
-	for (const auto &car : m_Cars)
-	{
-		car.draw(renderer);
-	}
-
-	m_Platform->draw(renderer);
+	BL_LOG("Finished creating next generation");
 }

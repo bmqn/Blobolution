@@ -4,13 +4,10 @@
 #include "Layer.h"
 #include "Event.h"
 
-#include <memory>
-#include <vector>
-
 class Application
 {
 public:
-	static Application &get()
+	static Application &Get()
 	{
 		static Application app;
 
@@ -18,24 +15,27 @@ public:
 	}
 
 public:
-	void setTitle(std::string title) { m_window->setTitle(title); }
+	void Run();
+	void Close();
 
-	void pushLayer(std::shared_ptr<Layer> layer);
-	void run();
-	void shutdown();
+	void PushLayer(std::unique_ptr<Layer> layer);
 
-	Window& getWindow() { return *m_window; }
+	const Window& GetWindow() { return *m_Window; }
 
 private:
 	Application();
 
-	void onEvent(Event &e);
+	void Create();
+	void Destroy();
 
-	bool onWindowClose(WindowCloseEvent &e);
-	bool onWindowResize(WindowResizeEvent &e);
+	void OnEvent(Event &e);
+
+	bool OnWindowClose(WindowCloseEvent &e);
+	bool OnWindowResize(WindowResizeEvent &e);
 
 private:
 	bool m_Running;
-	std::unique_ptr<Window> m_window;
-	std::vector<std::shared_ptr<Layer>> m_Layers;
+	
+	std::unique_ptr<Window> m_Window;
+	std::vector<std::unique_ptr<Layer>> m_Layers;
 };
