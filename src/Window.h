@@ -24,7 +24,7 @@ public:
 	Window() = default;
 	~Window();
 
-	void Init(int width, int height, const std::string& title);
+	void Init(int width, int height, const std::string &title);
 	void OnUpdate();
 	void Destroy();
 
@@ -32,10 +32,10 @@ public:
 	int GetHeight() const { return m_Data.Height; }
 
 	void SetCallback(const std::function<void(Event &e)> &callback) { m_Data.Callback = callback; }
-	void SetTitle(const std::string& title) { glfwSetWindowTitle(m_Window, title.c_str()); }
+	void SetTitle(const std::string &title) { glfwSetWindowTitle(m_Window, title.c_str()); }
 	void SetSwapInterval(bool state) { glfwSwapInterval(state ? 1 : 0); }
 
 	double GetTime() const { return glfwGetTime(); }
 
-	inline GLFWwindow* GetGlfwWindow() const { return m_Window; }
+	inline GLFWwindow *GetGlfwWindow() const { return m_Window; }
 };

@@ -13,14 +13,14 @@ public:
 
 	virtual void OnUpdate(float delta) override;
 	virtual void OnDrawImGui() override;
-	virtual void OnEvent(Event& e) override;
+	virtual void OnEvent(Event &e) override;
 
 private:
-	bool OnMouseMoved(MouseMovedEvent& e);
-	bool OnMousePressed(MousePressedEvent& e);
-	bool OnMouseReleased(MouseReleasedEvent& e);
-	bool OnMouseScrolled(MouseScrolledEvent& e);
-	bool OnKeyPressed(KeyPressedEvent& e);
+	bool OnMouseMoved(MouseMovedEvent &e);
+	bool OnMousePressed(MousePressedEvent &e);
+	bool OnMouseReleased(MouseReleasedEvent &e);
+	bool OnMouseScrolled(MouseScrolledEvent &e);
+	bool OnKeyPressed(KeyPressedEvent &e);
 
 private:
 	Generation m_Generation;

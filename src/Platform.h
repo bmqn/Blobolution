@@ -6,10 +6,6 @@
 
 class Platform
 {
-
-private:
-	
-
 public:
 	Platform();
 
@@ -19,7 +15,6 @@ public:
 	void Draw();
 
 private:
-	bool    m_IsCreated;
-	b2Body* m_Body;
-	int     m_PlatformCount;
+	b2Body *m_PlatformBody;
+	int m_PlatformCount;
 };

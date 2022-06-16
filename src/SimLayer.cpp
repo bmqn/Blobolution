@@ -14,7 +14,7 @@ bool SimLayer::OnMouseMoved(MouseMovedEvent &e)
 
 	if (m_MousePressed && !m_FollowCam)
 	{
-		m_CamPosition -= glm::vec3 {e.Xpos - xpos, ypos - e.Ypos, 0.0f } * (0.05f / m_CamScale);
+		m_CamPosition -= glm::vec3{e.Xpos - xpos, ypos - e.Ypos, 0.0f} * (0.05f / m_CamScale);
 	}
 
 	xpos = e.Xpos;
@@ -33,7 +33,7 @@ bool SimLayer::OnMousePressed(MousePressedEvent &e)
 	return false;
 }
 
-bool SimLayer::OnMouseReleased(MouseReleasedEvent& e)
+bool SimLayer::OnMouseReleased(MouseReleasedEvent &e)
 {
 	if (e.Button == GLFW_MOUSE_BUTTON_1)
 	{
@@ -63,35 +63,35 @@ bool SimLayer::OnKeyPressed(KeyPressedEvent &e)
 {
 	static constexpr float kEpsilon = 0.01f;
 
-	switch(e.Key)
+	switch (e.Key)
 	{
-		case GLFW_KEY_ESCAPE:
-			BL_LOG("Closing application.");
-			Application::Get().Close();
-			break;
-		case GLFW_KEY_F:
-			m_FollowCam = !m_FollowCam;
-			BL_LOG("Follow car %s", m_FollowCam ? "enabled" : "disabled");
-			break;
-		case GLFW_KEY_E:
-			if (std::fabs(m_TimeScale - 10.0f) > kEpsilon)
-			{
-				m_TimeScale += 0.2f;
-				BL_LOG("Timescale increased to %.2f", m_TimeScale);
-			}
-			break;
-		case GLFW_KEY_Q:
-			if (std::fabs(m_TimeScale - 0.2f) > kEpsilon)
-			{
-				m_TimeScale -= 0.2f;
-				BL_LOG("Timescale decreased to %.2f", m_TimeScale);
-			}
-			break;
-		case GLFW_KEY_SPACE:
-			m_Paused = !m_Paused;
-			BL_LOG("Pause %s", m_Paused ? "enabled" : "disabled");
-			break;
-	}	
+	case GLFW_KEY_ESCAPE:
+		BL_LOG("Closing application.");
+		Application::Get().Close();
+		break;
+	case GLFW_KEY_F:
+		m_FollowCam = !m_FollowCam;
+		BL_LOG("Follow car %s", m_FollowCam ? "enabled" : "disabled");
+		break;
+	case GLFW_KEY_E:
+		if (std::fabs(m_TimeScale - 10.0f) > kEpsilon)
+		{
+			m_TimeScale += 0.2f;
+			BL_LOG("Timescale increased to %.2f", m_TimeScale);
+		}
+		break;
+	case GLFW_KEY_Q:
+		if (std::fabs(m_TimeScale - 0.2f) > kEpsilon)
+		{
+			m_TimeScale -= 0.2f;
+			BL_LOG("Timescale decreased to %.2f", m_TimeScale);
+		}
+		break;
+	case GLFW_KEY_SPACE:
+		m_Paused = !m_Paused;
+		BL_LOG("Pause %s", m_Paused ? "enabled" : "disabled");
+		break;
+	}
 
 	return false;
 }
@@ -118,17 +118,17 @@ void SimLayer::OnUpdate(float delta)
 	if (m_FollowCam)
 	{
 		b2Vec2 position = m_Generation.GetBestCar().GetPosition();
-		m_CamPosition = { position.x, position.y, 0.0f };
+		m_CamPosition = {position.x, position.y, 0.0f};
 	}
 
-	const Window& window = Application::Get().GetWindow();
-	float width  = static_cast<float>(window.GetWidth());
+	const Window &window = Application::Get().GetWindow();
+	float width = static_cast<float>(window.GetWidth());
 	float height = static_cast<float>(window.GetHeight());
 	float aspect = width / height;
 
-	auto viewProj =   glm::ortho(-10.0f * aspect, 10.0f * aspect, -10.0f, 10.0f)
-	                * glm::scale(glm::mat4(1.0f), glm::vec3(m_CamScale))
-	                * glm::translate(glm::mat4(1.0f), -m_CamPosition);
+	auto viewProj = glm::ortho(-10.0f * aspect, 10.0f * aspect, -10.0f, 10.0f)
+					* glm::scale(glm::mat4(1.0f), glm::vec3(m_CamScale))
+					* glm::translate(glm::mat4(1.0f), -m_CamPosition);
 
 	Renderer::BeginScene(viewProj);
 	m_Generation.Draw();

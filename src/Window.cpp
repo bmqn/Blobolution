@@ -6,14 +6,14 @@ Window::~Window()
 	Destroy();
 }
 
-void Window::Init(int width, int height, const std::string& title)
+void Window::Init(int width, int height, const std::string &title)
 {
-	m_Data.Width  = width;
+	m_Data.Width = width;
 	m_Data.Height = height;
-	m_Data.Title  = title;
+	m_Data.Title = title;
 
 	// Create GLFW error callback
-	glfwSetErrorCallback([](int error, const char* description)
+	glfwSetErrorCallback([](int error, const char *description)
 	{
 		BL_LOG("GLFW Error: %s", description);
 	});

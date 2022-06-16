@@ -3,8 +3,8 @@
 
 int main()
 {
-	auto& app = Application::Get();
-	
+	auto &app = Application::Get();
+
 	app.PushLayer(std::make_unique<SimLayer>());
 	app.Run();
 

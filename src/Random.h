@@ -15,8 +15,6 @@ public:
 
 	static void Destroy() {}
 
-
-
 	static bool Bool()
 	{
 		return Float<float>() < 0.5f;

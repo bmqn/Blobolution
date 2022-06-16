@@ -57,7 +57,7 @@ void Car::Create(b2World& world, const CarProto& carProto)
 		m_ChassisBody = world.CreateBody(&chassisDef);
 		m_ChassisBody->CreateFixture(&chassisFixture);
 
-		for (const WheelProto& wheel : m_Proto.Wheels)
+		for (const WheelProto &wheel : m_Proto.Wheels)
 		{
 			b2CircleShape wheelShape;
 			wheelShape.m_radius = wheel.Radius;
@@ -102,12 +102,12 @@ void Car::Destory()
 	{
 		b2World *world = m_ChassisBody->GetWorld();
 
-		for (b2Joint* wJoint : m_WheelJoints)
+		for (b2Joint *wJoint : m_WheelJoints)
 		{
 			world->DestroyJoint(wJoint);
 		}
 
-		for (b2Body* wBody : m_WheelBodies)
+		for (b2Body *wBody : m_WheelBodies)
 		{
 			world->DestroyBody(wBody);
 		}

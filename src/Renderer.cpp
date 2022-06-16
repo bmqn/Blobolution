@@ -15,16 +15,19 @@ struct Vertex
 
 struct BatchRendererData
 {
-	GLuint  Program;
-	GLuint  Vao, Vbo;
-	Vertex* BatchDataPtr;
+	GLuint Program;
+	GLuint Vao, Vbo;
+	Vertex *BatchDataPtr;
 	GLsizei VerticesCount;
 
 	BatchRendererData()
-		: Program(0), Vao(0), Vbo(0)
+		: Program(0)
+		, Vao(0)
+		, Vbo(0)
 		, BatchDataPtr(nullptr)
 		, VerticesCount(0)
-	{}
+	{
+	}
 };
 
 static glm::mat4 s_ViewProj;
@@ -58,7 +61,7 @@ void Renderer::Destroy()
 
 void Renderer::InitCircleRenderer()
 {
-	const char* vertexShaderSrc =
+	const char *vertexShaderSrc =
 		"#version 330 core\n"
 		"layout (location = 0) in vec3 a_WorldPosition;\n"
 		"layout (location = 1) in vec2 a_LocalPosition;\n"
@@ -73,7 +76,7 @@ void Renderer::InitCircleRenderer()
 		"	gl_Position = u_ViewProj * vec4(a_WorldPosition, 1.0);\n"
 		"}\n";
 
-	const char* fragmentShaderSrc =
+	const char *fragmentShaderSrc =
 		"#version 330 core\n"
 		"layout (location = 0) out vec4 o_Colour;\n"
 		"in vec4 v_Colour;\n"
@@ -128,16 +131,16 @@ void Renderer::InitCircleRenderer()
 	glBindVertexArray(s_CircleRendererData.Vao);
 
 	glBindBuffer(GL_ARRAY_BUFFER, s_CircleRendererData.Vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * kMaxVertices, (GLvoid*)0, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * kMaxVertices, (GLvoid *)0, GL_DYNAMIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)0);
 
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(3 * sizeof(float)));
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)(3 * sizeof(float)));
 
 	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(5 * sizeof(float)));
+	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)(5 * sizeof(float)));
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -148,7 +151,7 @@ void Renderer::MapCircleBuffer()
 {
 	// Remap the buffer
 	glBindBuffer(GL_ARRAY_BUFFER, s_CircleRendererData.Vbo);
-	s_CircleRendererData.BatchDataPtr = (Vertex*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	s_CircleRendererData.BatchDataPtr = (Vertex *)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -198,7 +201,7 @@ void Renderer::InitTriangleRenderer()
 		"	v_Colour = a_Colour;\n"
 		"	gl_Position = u_ViewProj * vec4(a_WorldPosition, 1.0);\n"
 		"}\n";
-	
+
 	const char *fragmentShaderSrc =
 		"#version 330 core\n"
 		"layout (location = 0) out vec4 o_Colour;\n"
@@ -250,13 +253,13 @@ void Renderer::InitTriangleRenderer()
 	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * kMaxVertices, (GLvoid *)0, GL_DYNAMIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)0);
 
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(3 * sizeof(float)));
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)(3 * sizeof(float)));
 
 	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(5 * sizeof(float)));
+	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)(5 * sizeof(float)));
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -369,13 +372,13 @@ void Renderer::InitLineRenderer()
 	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * kMaxVertices, (GLvoid *)0, GL_DYNAMIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)0);
 
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(3 * sizeof(float)));
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)(3 * sizeof(float)));
 
 	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(5 * sizeof(float)));
+	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)(5 * sizeof(float)));
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -435,7 +438,7 @@ void Renderer::SetViewportSize(int width, int height)
 
 void Renderer::BeginScene(const glm::mat4 &viewProj)
 {
-	if (   s_CircleRendererData.VerticesCount > 0
+	if (s_CircleRendererData.VerticesCount > 0
 		|| s_TriangleRendererData.VerticesCount > 0
 		|| s_LineRendererData.VerticesCount > 0)
 	{
@@ -479,7 +482,7 @@ void Renderer::FlushScene()
 	FlushLineVertices();
 }
 
-void Renderer::SubmitFilledCircle(const glm::vec3& position, float radius, const glm::vec4& colour)
+void Renderer::SubmitFilledCircle(const glm::vec3 &position, float radius, const glm::vec4 &colour)
 {
 	// Improve this optimization.
 	auto v = s_ViewProj * glm::vec4(position, 1.0f);
@@ -494,9 +497,9 @@ void Renderer::SubmitFilledCircle(const glm::vec3& position, float radius, const
 	}
 
 	glm::vec3 p1 = glm::vec3(-1.0, -1.0, position.z);
-	glm::vec3 p2 = glm::vec3(-1.0,  1.0, position.z);
-	glm::vec3 p3 = glm::vec3( 1.0,  1.0, position.z);
-	glm::vec3 p4 = glm::vec3( 1.0, -1.0, position.z);
+	glm::vec3 p2 = glm::vec3(-1.0, 1.0, position.z);
+	glm::vec3 p3 = glm::vec3(1.0, 1.0, position.z);
+	glm::vec3 p4 = glm::vec3(1.0, -1.0, position.z);
 
 	s_CircleRendererData.BatchDataPtr->WorldPosition = position + p1 * radius;
 	s_CircleRendererData.BatchDataPtr->LocalPosition = p1;
@@ -537,7 +540,7 @@ void Renderer::SubmitFilledCircle(const glm::vec3& position, float radius, const
 	s_CircleRendererData.VerticesCount += 6;
 }
 
-void Renderer::SubmitFilledPolygon(const std::vector<glm::vec3>& vertices, const glm::vec4& colour)
+void Renderer::SubmitFilledPolygon(const std::vector<glm::vec3> &vertices, const glm::vec4 &colour)
 {
 	// Improve this optimization.
 	auto v = s_ViewProj * glm::vec4(vertices[0], 1.0f);
@@ -556,12 +559,11 @@ void Renderer::SubmitFilledPolygon(const std::vector<glm::vec3>& vertices, const
 		Renderer::MapLineBuffer();
 	}
 
-	glm::vec4 fillColour {
+	glm::vec4 fillColour{
 		colour.r * 0.5f,
 		colour.g * 0.5f,
 		colour.b * 0.5f,
-		colour.a
-	};
+		colour.a};
 
 	for (size_t i = 0; i < vertexCount - 2; i++)
 	{
@@ -598,7 +600,8 @@ void Renderer::SubmitFilledPolygon(const std::vector<glm::vec3>& vertices, const
 
 		s_LineRendererData.BatchDataPtr++;
 
-		s_LineRendererData.BatchDataPtr->WorldPosition = p2 + glm::vec3(0.0f, 0.0f, 0.01f);;
+		s_LineRendererData.BatchDataPtr->WorldPosition = p2 + glm::vec3(0.0f, 0.0f, 0.01f);
+		;
 		// s_TriangleRendererData.BatchDataPtr->LocalPosition = glm::vec2();
 		s_LineRendererData.BatchDataPtr->Colour = colour;
 
@@ -610,7 +613,7 @@ void Renderer::SubmitFilledPolygon(const std::vector<glm::vec3>& vertices, const
 	}
 }
 
-void Renderer::SubmitLine(const glm::vec3& p1, const glm::vec3& p2, const glm::vec4& colour)
+void Renderer::SubmitLine(const glm::vec3 &p1, const glm::vec3 &p2, const glm::vec4 &colour)
 {
 	// Improve this optimization.
 	auto v = s_ViewProj * glm::vec4(p1, 1.0f);

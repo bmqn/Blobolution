@@ -36,8 +36,8 @@ public:
 	static void BeginScene(const glm::mat4 &viewProj);
 	static void EndScene();
 
-	static void SubmitFilledCircle(const glm::vec3& position, float radius, const glm::vec4& colour);
-	static void SubmitFilledPolygon(const std::vector<glm::vec3>& vertices, const glm::vec4& colour);
+	static void SubmitFilledCircle(const glm::vec3 &position, float radius, const glm::vec4 &colour);
+	static void SubmitFilledPolygon(const std::vector<glm::vec3> &vertices, const glm::vec4 &colour);
 
-	static void SubmitLine(const glm::vec3& p1, const glm::vec3& p2, const glm::vec4& colour);
+	static void SubmitLine(const glm::vec3 &p1, const glm::vec3 &p2, const glm::vec4 &colour);
 };

@@ -86,7 +86,7 @@ void Generation::Draw() const
 		m_Platform->Draw();
 	}
 
-	for (const auto& car : m_Cars)
+	for (const auto &car : m_Cars)
 	{
 		car.Draw();
 	}

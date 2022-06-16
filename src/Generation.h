@@ -9,12 +9,11 @@
 
 class Generation
 {
-
 private:
-	std::unique_ptr<b2World>  m_World;
+	std::unique_ptr<b2World> m_World;
 
 	std::unique_ptr<Platform> m_Platform;
-	std::vector<Car>          m_Cars;
+	std::vector<Car> m_Cars;
 
 public:
 	Generation();
