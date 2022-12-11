@@ -13,7 +13,7 @@ private:
 	std::unique_ptr<b2World> m_World;
 
 	std::unique_ptr<Platform> m_Platform;
-	std::vector<Car> m_Cars;
+	std::vector<std::unique_ptr<Car>> m_Cars;
 
 public:
 	Generation();
@@ -22,9 +22,8 @@ public:
 	void Create(int numCars);
 	void Update(float delta);
 	void Draw() const;
-	void DrawImGui() const;
 
-	const Car &GetBestCar() const;
+	const Car *GetBestCar() const;
 
 private:
 	void NextGeneration();

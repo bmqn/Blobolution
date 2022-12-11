@@ -16,15 +16,11 @@ Car::Car()
 {
 }
 
-Car::~Car()
-{
-}
-
 void Car::Create(b2World& world, const CarProto& carProto)
 {
-	BL_ASSERT(m_ChassisBody == nullptr, "The car has already been created !");
+	BL_ASSERT(!m_ChassisBody, "The car has already been created !");
 
-	if (m_ChassisBody == nullptr)
+	if (!m_ChassisBody)
 	{
 		m_Proto = carProto;
 		m_Health = 180;
@@ -96,9 +92,9 @@ void Car::Create(b2World& world, const CarProto& carProto)
 
 void Car::Destory()
 {
-	BL_ASSERT(m_ChassisBody != nullptr, "The car has not been created !");
+	BL_ASSERT(m_ChassisBody, "The car has not been created !");
 
-	if (m_ChassisBody != nullptr)
+	if (m_ChassisBody)
 	{
 		b2World *world = m_ChassisBody->GetWorld();
 
@@ -122,7 +118,7 @@ void Car::Destory()
 
 void Car::Draw() const
 {
-	if (m_ChassisBody != nullptr)
+	if (m_ChassisBody)
 	{
 		// Wheels
 		for (const b2Body *wheelBody : m_WheelBodies)
@@ -262,13 +258,12 @@ void Car::Draw() const
 
 void Car::Update(float delta)
 {
-	if (m_ChassisBody != nullptr)
+	if (m_ChassisBody)
 	{
 		if (!IsDead())
 		{
 			int ticker = static_cast<int>(100.0f * delta);
 			ticker = ticker <= 0 ? 1 : ticker;
-
 			if (m_ChassisBody->GetLinearVelocity().x <= CarConstants::kMinSpeed)
 			{
 				m_Health -= ticker;
@@ -301,13 +296,11 @@ CarProto Car::RandomProto()
 		carProto.Vertices[i] = { Random::Float(8.0f, 15.0f) * static_cast<float>(cosf(angle)),
 								 Random::Float(8.0f, 15.0f) * static_cast<float>(sinf(angle)) };
 	}
-
 	carProto.Density =  (  CarConstants::kMaxChassisDensity
 	                     - CarConstants::kMinChassisDensity) * Random::Float(0.0f, 1.0f)
 	                  + CarConstants::kMinChassisDensity;
 	carProto.Friction = Random::Float(0.0f, 1.0f);
 	carProto.Restitution = Random::Float(0.0f, 1.0f);
-	
 	{
 		float r =  (carProto.Density - CarConstants::kMinChassisDensity)
 		         / (CarConstants::kMaxChassisDensity - CarConstants::kMinChassisDensity);
@@ -317,13 +310,9 @@ CarProto Car::RandomProto()
 	}
 
 	int wheelCount = Random::Int(1, 5);
-
-	BL_ASSERT(wheelCount > 0);
-
 	for (int i = 0; i < wheelCount; i++)
 	{
 		WheelProto wheelProto;
-
 		wheelProto.Density =  Random::Float(CarConstants::kMinWheelDensity, CarConstants::kMaxWheelDensity);
 		wheelProto.Friction = Random::Float(0.0f, 1.0f);
 		wheelProto.Restitution = Random::Float(0.0f, 1.0f);
@@ -337,7 +326,6 @@ CarProto Car::RandomProto()
 			float b = wheelProto.Restitution;
 			wheelProto.Colour = { r, g, b, 1.0f };
 		}
-
 		carProto.Wheels.push_back(wheelProto);
 	}
 

@@ -7,7 +7,8 @@ class Layer
 public:
 	virtual ~Layer() {}
 
-	virtual void OnUpdate(float delta) = 0;
+	virtual void OnUpdate() = 0;
+	virtual void OnDraw() = 0;
 	virtual void OnDrawImGui() = 0;
 	virtual void OnEvent(Event &e) = 0;
 

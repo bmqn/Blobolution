@@ -61,7 +61,6 @@ private:
 
 public:
 	Car();
-	~Car();
 
 	inline uint32_t GetCarId() const { return m_CarId; }
 

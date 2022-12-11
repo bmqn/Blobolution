@@ -11,7 +11,8 @@ class SimLayer : public Layer
 public:
 	SimLayer();
 
-	virtual void OnUpdate(float delta) override;
+	virtual void OnUpdate() override;
+	virtual void OnDraw() override;
 	virtual void OnDrawImGui() override;
 	virtual void OnEvent(Event &e) override;
 
@@ -24,8 +25,9 @@ private:
 
 private:
 	Generation m_Generation;
-
+	int m_TimeMultiplier;
+	
 	glm::vec3 m_CamPosition;
-	float m_CamScale, m_TimeScale;
+	float m_CamScale;
 	bool m_MousePressed, m_FollowCam, m_Paused;
 };

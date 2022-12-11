@@ -4,8 +4,6 @@
 
 #include <box2d/box2d.h>
 
-#include <imgui.h>
-
 template <typename T, typename U>
 static T& mutate(T &value, U amount, T min, T max)
 {
@@ -28,7 +26,7 @@ static T& offset(T &value, T amount)
 }
 
 Generation::Generation()
-	: m_World(std::make_unique<b2World>(b2Vec2{ 0.0f, -10.0f }))
+	: m_World(nullptr)
 	, m_Platform(nullptr)
 	, m_Cars(0)
 {
@@ -36,43 +34,50 @@ Generation::Generation()
 
 Generation::~Generation()
 {
-	if (m_Platform)
+	if (!m_World)
 	{
-		m_Platform->Destory();
+		return;
 	}
 
+	m_Platform->Destory();
 	for (auto &car : m_Cars)
 	{
-		car.Destory();
+		car->Destory();
 	}
 }
 
 void Generation::Create(int numCars)
 {
+	m_World = std::make_unique<b2World>(b2Vec2{ 0.0f, -10.0f });
+
 	m_Platform = std::make_unique<Platform>();
 	m_Platform->Create(*m_World, 1024);
 	
 	m_Cars.resize(numCars);
 	for (auto &car : m_Cars)
 	{
-		car.Create(*m_World, Car::RandomProto());
+		car = std::make_unique<Car>();
+		car->Create(*m_World, Car::RandomProto());
 	}
 }
 
 void Generation::Update(float delta)
 {
+	if (!m_World)
+	{
+		return;
+	}
+	
 	m_World->Step(delta, 6, 2);
-
 	int deadCount = 0;
-
 	for (auto &car : m_Cars)
 	{
-		car.Update(delta);
-
-		if (car.IsDead())
+		car->Update(delta);
+		if (car->IsDead())
+		{
 			deadCount++;
+		}
 	}
-
 	if (deadCount == m_Cars.size())
 	{
 		NextGeneration();
@@ -81,97 +86,48 @@ void Generation::Update(float delta)
 
 void Generation::Draw() const
 {
-	if (m_Platform)
+	if (!m_World)
 	{
-		m_Platform->Draw();
+		return;
 	}
 
+	m_Platform->Draw();
 	for (const auto &car : m_Cars)
 	{
-		car.Draw();
+		car->Draw();
 	}
 }
 
-void Generation::DrawImGui() const
+const Car *Generation::GetBestCar() const
 {
-	ImGui::Begin("Generation");
-	
-	if (ImGui::CollapsingHeader("Best Car"))
+	if (!m_World)
 	{
-		ImGui::Indent();
-
-		const Car& car = GetBestCar();
-		const CarProto& proto = car.GetProto();
-	
-		ImGui::Text("Car Id: %u", car.GetCarId());
-		ImGui::Separator();
-		ImGui::Text("Health: %u", car.GetHealth());
-		ImGui::Text("Fitness: %u", car.GetFitness());
-		ImGui::Text("Velocity: (%0.3f, %0.3f)", car.GetVelocity().x, car.GetVelocity().y);
-		ImGui::Text("Position: (%0.3f, %0.3f)", car.GetPosition().x, car.GetPosition().y);
-
-		if (ImGui::CollapsingHeader("Wheels"))
-		{
-			int wheelNum = 1;
-			for (const auto& wheel : proto.Wheels)
-			{
-				ImGui::Indent();
-
-				char wheelNStr[32];
-				std::sprintf(wheelNStr, "Wheel %d", wheelNum++);
-
-				if (ImGui::CollapsingHeader(wheelNStr))
-				{
-					ImGui::Indent();
-					ImGui::Text("Motor Speed: %0.3f", wheel.MotorSpeed);
-					ImGui::Text("Radius: %0.3f", wheel.Radius);
-					ImGui::Text("Density: %0.3f", wheel.Density);
-					ImGui::Text("Friction: %0.3f", wheel.Friction);
-					ImGui::Text("Restitution: %0.3f", wheel.Restitution);
-					ImGui::Unindent();
-				}
-
-				ImGui::Unindent();
-			}
-		}
-
-		if (ImGui::CollapsingHeader("Chassis"))
-		{
-			ImGui::Indent();
-			ImGui::Text("Density: %0.3f", proto.Density);
-			ImGui::Text("Friction: %0.3f", proto.Friction);
-			ImGui::Text("Restitution: %0.3f", proto.Restitution);
-			ImGui::Unindent();
-		}
-
-		ImGui::Unindent();
+		return nullptr;
 	}
-	
-	ImGui::End();
-}
 
-const Car &Generation::GetBestCar() const
-{
-	const Car *bestCar = &m_Cars.front();
+	const Car *bestCar = nullptr;
 	glm::vec3 bestPosition = { 0.0, 0.0, 0.0f };
-
 	for (const auto& car : m_Cars)
 	{
-		b2Vec2 pos = car.GetPosition();
+		b2Vec2 pos = car->GetPosition();
 
-		if (pos.x > bestPosition.x && !car.IsDead())
+		if (pos.x > bestPosition.x && !car->IsDead())
 		{
 			bestPosition.x = pos.x;
 			bestPosition.y = pos.y;
-			bestCar = &car;
+			bestCar = car.get();
 		}
 	}
-
-	return *bestCar;
+	return bestCar;
 }
 
 void Generation::NextGeneration()
 {
+	if (!m_World)
+	{
+		return;
+	}
+
 	BL_LOG("Starting to create next generation");
 
 	using RatioRange       = std::pair<double, double>;
@@ -187,21 +143,20 @@ void Generation::NextGeneration()
 	size_t numParents = numCars / 2;
 
 	float totalFitness = static_cast<float>(
-		std::accumulate(m_Cars.begin(), m_Cars.end(), 0_zu, [](size_t i, const Car &car)
+		std::accumulate(m_Cars.begin(), m_Cars.end(), 0_zu, [](size_t i, const auto &car)
 		{
-			return i + car.GetFitness();
+			return i + car->GetFitness();
 		})
 	);
 	
 	{
 		float cumlRatio = 0.;
-
 		for (auto curr = m_Cars.cbegin(); curr != m_Cars.cend(); ++curr)
 		{
-			float ratio = static_cast<float>(curr->GetFitness()) / totalFitness;
+			float ratio = static_cast<float>((*curr)->GetFitness()) / totalFitness;
 			cumlRatio += ratio;
 
-			carProtosRoulette.push_back({ {cumlRatio - ratio, cumlRatio}, curr->GetProto() });
+			carProtosRoulette.push_back({ {cumlRatio - ratio, cumlRatio}, (*curr)->GetProto() });
 		}
 	}
 
@@ -546,8 +501,8 @@ void Generation::NextGeneration()
 				++i;
 			}
 
-			car.Destory();
-			car.Create(*m_World, newCarData);
+			car->Destory();
+			car->Create(*m_World, newCarData);
 		}
 	}
 

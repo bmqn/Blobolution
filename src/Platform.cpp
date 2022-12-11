@@ -10,9 +10,9 @@ Platform::Platform()
 
 void Platform::Create(b2World &world, int platformCount)
 {
-	BL_ASSERT(m_PlatformBody == nullptr, "The platform has already been created !");
+	BL_ASSERT(!m_PlatformBody, "The platform has already been created !");
 
-	if (m_PlatformBody == nullptr)
+	if (!m_PlatformBody)
 	{
 		m_PlatformCount = platformCount;
 
@@ -26,7 +26,7 @@ void Platform::Create(b2World &world, int platformCount)
 
 		for (int i = 0; i < m_PlatformCount; i++)
 		{
-			angle = 1.05f * Random::Float(-0.5f, 0.5f) * powf(
+			angle = 1.05f * Random::Float(-0.5f, 0.5f) * std::powf(
 				2.0f, static_cast<float>(i) / static_cast<float>(m_PlatformCount)
 			);
 
@@ -35,10 +35,10 @@ void Platform::Create(b2World &world, int platformCount)
 
 			prevAngle = angle;
 
-			b2Vec2 p1 = {-5.0f * cos(angle) - 1.0f * sin(angle) + x / 2.0f, -5.0f * sin(angle) + 1.0f * cos(angle) + y / 2.0f};
-			b2Vec2 p2 = {-5.0f * cos(angle) + 1.0f * sin(angle) + x / 2.0f, -5.0f * sin(angle) - 1.0f * cos(angle) + y / 2.0f};
-			b2Vec2 p3 = {5.0f * cos(angle) + 1.0f * sin(angle) + x / 2.0f, 5.0f * sin(angle) - 1.0f * cos(angle) + y / 2.0f};
-			b2Vec2 p4 = {5.0f * cos(angle) - 1.0f * sin(angle) + x / 2.0f, 5.0f * sin(angle) + 1.0f * cos(angle) + y / 2.0f};
+			b2Vec2 p1 = {-5.0f * std::cos(angle) - 1.0f * std::sin(angle) + x / 2.0f, -5.0f * std::sin(angle) + 1.0f * std::cos(angle) + y / 2.0f};
+			b2Vec2 p2 = {-5.0f * std::cos(angle) + 1.0f * std::sin(angle) + x / 2.0f, -5.0f * std::sin(angle) - 1.0f * std::cos(angle) + y / 2.0f};
+			b2Vec2 p3 = {5.0f * std::cos(angle) + 1.0f * std::sin(angle) + x / 2.0f, 5.0f * std::sin(angle) - 1.0f * std::cos(angle) + y / 2.0f};
+			b2Vec2 p4 = {5.0f * std::cos(angle) - 1.0f * std::sin(angle) + x / 2.0f, 5.0f * std::sin(angle) + 1.0f * std::cos(angle) + y / 2.0f};
 
 			b2Vec2 points[] = {p1, p2, p3, p4};
 
@@ -58,9 +58,9 @@ void Platform::Create(b2World &world, int platformCount)
 
 void Platform::Destory()
 {
-	BL_ASSERT(m_PlatformBody != nullptr, "The platform has not been created !");
+	BL_ASSERT(m_PlatformBody, "The platform has not been created !");
 
-	if (m_PlatformBody != nullptr)
+	if (m_PlatformBody)
 	{
 		m_PlatformBody->GetWorld()->DestroyBody(m_PlatformBody);
 	}
@@ -68,7 +68,7 @@ void Platform::Destory()
 
 void Platform::Draw()
 {
-	if (m_PlatformBody != nullptr)
+	if (m_PlatformBody)
 	{
 		b2Vec2 pos = m_PlatformBody->GetPosition();
 		float rot = m_PlatformBody->GetAngle();
@@ -83,8 +83,8 @@ void Platform::Draw()
 
 			for (int i = 0; i < vertexCount; i++)
 			{
-				float x = (vertexArray[i].x * std::cos(rot) - vertexArray[i].y * std::sin(rot)) + pos.x;
-				float y = (vertexArray[i].x * std::sin(rot) + vertexArray[i].y * std::cos(rot)) + pos.y;
+				float x = (vertexArray[i].x * std::cosf(rot) - vertexArray[i].y * std::sinf(rot)) + pos.x;
+				float y = (vertexArray[i].x * std::sinf(rot) + vertexArray[i].y * std::cosf(rot)) + pos.y;
 
 				vertices.push_back({x, y, 0.0f});
 			}

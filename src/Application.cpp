@@ -12,29 +12,31 @@
 
 void Application::Run()
 {
-	static constexpr double kDeltaTime = 1. / 60.;
-
 	m_Running = true;
 
-	double currTime = m_Window->GetTime();
-	double accumulator = 0.;
+	double prevTime = m_Window->GetTime();
+	double accumulTime = 0.0;
 
 	while (m_Running)
 	{
-		double newTime = m_Window->GetTime();
-		double deltaTime = newTime - currTime;
-		currTime = newTime;
+		double currTime = m_Window->GetTime();
+		double deltaTime = currTime - prevTime;
+		prevTime = currTime;
 
-		accumulator += deltaTime;
-
-		while (accumulator >= kDeltaTime)
+		accumulTime += deltaTime;
+		while (accumulTime >= k_UpdateDeltaTime)
 		{
 			for (std::unique_ptr<Layer> &layer : m_Layers)
 			{
-				layer->OnUpdate(static_cast<float>(kDeltaTime));
+				layer->OnUpdate();
 			}
 
-			accumulator -= deltaTime;
+			accumulTime -= k_UpdateDeltaTime;
+		}
+
+		for (std::unique_ptr<Layer>& layer : m_Layers)
+		{
+			layer->OnDraw();
 		}
 
 		{

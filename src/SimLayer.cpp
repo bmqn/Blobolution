@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>
 
+#include <imgui.h>
+
 bool SimLayer::OnMouseMoved(MouseMovedEvent &e)
 {
 	static double xpos = 0.0;
@@ -74,17 +76,17 @@ bool SimLayer::OnKeyPressed(KeyPressedEvent &e)
 		BL_LOG("Follow car %s", m_FollowCam ? "enabled" : "disabled");
 		break;
 	case GLFW_KEY_E:
-		if (std::fabs(m_TimeScale - 10.0f) > kEpsilon)
+		if (m_TimeMultiplier < 5)
 		{
-			m_TimeScale += 0.2f;
-			BL_LOG("Timescale increased to %.2f", m_TimeScale);
+			m_TimeMultiplier += 1;
+			BL_LOG("Time multiplier increased to %d", m_TimeMultiplier);
 		}
 		break;
 	case GLFW_KEY_Q:
-		if (std::fabs(m_TimeScale - 0.2f) > kEpsilon)
+		if (m_TimeMultiplier > 1)
 		{
-			m_TimeScale -= 0.2f;
-			BL_LOG("Timescale decreased to %.2f", m_TimeScale);
+			m_TimeMultiplier -= 1;
+			BL_LOG("Time multiplier decreased to %d", m_TimeMultiplier);
 		}
 		break;
 	case GLFW_KEY_SPACE:
@@ -98,37 +100,41 @@ bool SimLayer::OnKeyPressed(KeyPressedEvent &e)
 
 SimLayer::SimLayer()
 	: Layer("Simulation Layer")
-	, m_CamPosition(0, 0, 0)
-	, m_CamScale(0.5f)
-	, m_TimeScale(1.0f)
-	, m_MousePressed(false)
-	, m_FollowCam(false)
-	, m_Paused(false)
+	, m_TimeMultiplier(1)
+	, m_CamPosition(0, 0, 0), m_CamScale(0.5f)
+	, m_MousePressed(false), m_FollowCam(false), m_Paused(false)
 {
-	m_Generation.Create(100);
+	m_Generation.Create(50);
 }
 
-void SimLayer::OnUpdate(float delta)
+void SimLayer::OnUpdate()
 {
 	if (!m_Paused)
 	{
-		m_Generation.Update(delta * m_TimeScale);
+		for (int i = 0; i < m_TimeMultiplier; ++i)
+		{
+			m_Generation.Update(k_UpdateDeltaTime);
+		}
 	}
 
 	if (m_FollowCam)
 	{
-		b2Vec2 position = m_Generation.GetBestCar().GetPosition();
+		const Car *bestCar = m_Generation.GetBestCar();
+		b2Vec2 position = bestCar ? bestCar->GetPosition() : b2Vec2_zero;
 		m_CamPosition = {position.x, position.y, 0.0f};
 	}
+}
 
-	const Window &window = Application::Get().GetWindow();
+void SimLayer::OnDraw()
+{
+	const Window& window = Application::Get().GetWindow();
 	float width = static_cast<float>(window.GetWidth());
 	float height = static_cast<float>(window.GetHeight());
 	float aspect = width / height;
 
 	auto viewProj = glm::ortho(-10.0f * aspect, 10.0f * aspect, -10.0f, 10.0f)
-					* glm::scale(glm::mat4(1.0f), glm::vec3(m_CamScale))
-					* glm::translate(glm::mat4(1.0f), -m_CamPosition);
+		* glm::scale(glm::mat4(1.0f), glm::vec3(m_CamScale))
+		* glm::translate(glm::mat4(1.0f), -m_CamPosition);
 
 	Renderer::BeginScene(viewProj);
 	m_Generation.Draw();
@@ -137,7 +143,64 @@ void SimLayer::OnUpdate(float delta)
 
 void SimLayer::OnDrawImGui()
 {
-	m_Generation.DrawImGui();
+	ImGui::Begin("Generation");
+
+	if (ImGui::CollapsingHeader("Best Car"))
+	{
+		ImGui::Indent();
+
+		const Car *bestCar = m_Generation.GetBestCar();
+
+		if (bestCar)
+		{
+			const CarProto& proto = bestCar->GetProto();
+
+			ImGui::Text("Car Id: %u", bestCar->GetCarId());
+			ImGui::Separator();
+			ImGui::Text("Health: %u", bestCar->GetHealth());
+			ImGui::Text("Fitness: %u", bestCar->GetFitness());
+			ImGui::Text("Velocity: (%0.3f, %0.3f)", bestCar->GetVelocity().x, bestCar->GetVelocity().y);
+			ImGui::Text("Position: (%0.3f, %0.3f)", bestCar->GetPosition().x, bestCar->GetPosition().y);
+
+			if (ImGui::CollapsingHeader("Wheels"))
+			{
+				int wheelNum = 1;
+				for (const auto& wheel : proto.Wheels)
+				{
+					ImGui::Indent();
+
+					char wheelNStr[32];
+					std::sprintf(wheelNStr, "Wheel %d", wheelNum++);
+
+					if (ImGui::CollapsingHeader(wheelNStr))
+					{
+						ImGui::Indent();
+						ImGui::Text("Motor Speed: %0.3f", wheel.MotorSpeed);
+						ImGui::Text("Radius: %0.3f", wheel.Radius);
+						ImGui::Text("Density: %0.3f", wheel.Density);
+						ImGui::Text("Friction: %0.3f", wheel.Friction);
+						ImGui::Text("Restitution: %0.3f", wheel.Restitution);
+						ImGui::Unindent();
+					}
+
+					ImGui::Unindent();
+				}
+			}
+
+			if (ImGui::CollapsingHeader("Chassis"))
+			{
+				ImGui::Indent();
+				ImGui::Text("Density: %0.3f", proto.Density);
+				ImGui::Text("Friction: %0.3f", proto.Friction);
+				ImGui::Text("Restitution: %0.3f", proto.Restitution);
+				ImGui::Unindent();
+			}
+
+			ImGui::Unindent();
+		}
+	}
+
+	ImGui::End();
 }
 
 void SimLayer::OnEvent(Event &e)

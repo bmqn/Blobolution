@@ -1,78 +1,120 @@
 cmake_minimum_required(VERSION 3.1.0)
 
-set(BL_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(BL_ROOT_DIR			${CMAKE_CURRENT_SOURCE_DIR})
+set(BL_SRC_DIR			${BL_ROOT_DIR}/src)
+set(BL_LIB_DIR			${BL_ROOT_DIR}/libs)
+set(BL_RES_DIR			${BL_ROOT_DIR}/res)
 
+project(Blobolution)
+
+
+#--------------------------------------------------------------------------------------------------
+#	Configuration
+#--------------------------------------------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Box2D
+if(MSVC)
+add_compile_options(
+	$<$<CONFIG:RELEASE>:/Ox>
+	$<$<CONFIG:RELEASE>:/GL>
+)
+add_link_options(
+	$<$<CONFIG:RELEASE>:/LTCG>
+)
+else()
+add_compile_options(
+	$<$<CONFIG:RELEASE>:-Ofast>
+)
+add_link_options(
+	$<$<CONFIG:RELEASE>:-flto>
+)
+endif()
+
+
+#--------------------------------------------------------------------------------------------------
+#	Sources
+#--------------------------------------------------------------------------------------------------
+set(BL_HSP
+	"${BL_SRC_DIR}/"
+)
+
+
+set(BL_SRC
+	"${BL_SRC_DIR}/Prefix.pch"
+
+	"${BL_SRC_DIR}/Main.cpp"
+	"${BL_SRC_DIR}/Log.h"
+	"${BL_SRC_DIR}/Event.h"
+	"${BL_SRC_DIR}/Layer.h"
+	"${BL_SRC_DIR}/Random.h"
+	"${BL_SRC_DIR}/Random.cpp"
+	"${BL_SRC_DIR}/Application.h"
+	"${BL_SRC_DIR}/Application.cpp"
+	"${BL_SRC_DIR}/Window.h"
+	"${BL_SRC_DIR}/Window.cpp"
+	"${BL_SRC_DIR}/Renderer.h"
+	"${BL_SRC_DIR}/Renderer.cpp"
+	"${BL_SRC_DIR}/SimLayer.h"
+	"${BL_SRC_DIR}/SimLayer.cpp"
+	"${BL_SRC_DIR}/Generation.h"
+	"${BL_SRC_DIR}/Generation.cpp"
+	"${BL_SRC_DIR}/Platform.h"
+	"${BL_SRC_DIR}/Platform.cpp"
+	"${BL_SRC_DIR}/Car.h"
+	"${BL_SRC_DIR}/Car.cpp"
+	"${BL_SRC_DIR}/ImGuiBuild.cpp"
+)
+
+
+#--------------------------------------------------------------------------------------------------
+#	Libraries
+#--------------------------------------------------------------------------------------------------
+add_subdirectory("${BL_LIB_DIR}/glad")
+
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory("${BL_LIB_DIR}/glfw")
+
+add_subdirectory("${BL_LIB_DIR}/glm")
+
 set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
 set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "" FORCE)
 set(BOX2D_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(BOX2D_USER_SETTINGS OFF CACHE BOOL "" FORCE)
-add_subdirectory("${BL_ROOT_DIR}/libs/box2d")
+add_subdirectory("${BL_LIB_DIR}/box2d")
 
-# GLFW
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-add_subdirectory("${BL_ROOT_DIR}/libs/glfw")
-add_compile_definitions(GLFW_INCLUDE_NONE)
-
-
-# GLAD
-add_subdirectory("${BL_ROOT_DIR}/libs/glad")
-
-# GLM
-add_subdirectory("${BL_ROOT_DIR}/libs/glm")
-
-# ImGui
 set(IMGUI_SRC
-	"${BL_ROOT_DIR}/libs/imgui/imconfig.h"
-	"${BL_ROOT_DIR}/libs/imgui/imgui.h"
-	"${BL_ROOT_DIR}/libs/imgui/imgui.cpp"
-	"${BL_ROOT_DIR}/libs/imgui/imgui_internal.h"
-	"${BL_ROOT_DIR}/libs/imgui/imgui_demo.cpp"
-	"${BL_ROOT_DIR}/libs/imgui/imgui_draw.cpp"
-	"${BL_ROOT_DIR}/libs/imgui/imgui_tables.cpp"
-	"${BL_ROOT_DIR}/libs/imgui/imgui_widgets.cpp"
+	"${BL_LIB_DIR}/imgui/imconfig.h"
+	"${BL_LIB_DIR}/imgui/imgui.h"
+	"${BL_LIB_DIR}/imgui/imgui.cpp"
+	"${BL_LIB_DIR}/imgui/imgui_internal.h"
+	"${BL_LIB_DIR}/imgui/imgui_demo.cpp"
+	"${BL_LIB_DIR}/imgui/imgui_draw.cpp"
+	"${BL_LIB_DIR}/imgui/imgui_tables.cpp"
+	"${BL_LIB_DIR}/imgui/imgui_widgets.cpp"
 )
 add_library(imgui STATIC ${IMGUI_SRC})
-target_include_directories(imgui PUBLIC "${BL_ROOT_DIR}/libs/imgui")
+target_include_directories(imgui PUBLIC "${BL_LIB_DIR}/imgui")
 
-# Blobolution
-project(Blobolution)
-set(BL_SRC
-	"${BL_ROOT_DIR}/src/BlobolutionPch.pch"
-	"${BL_ROOT_DIR}/src/Main.cpp"
-	"${BL_ROOT_DIR}/src/Log.h"
-	"${BL_ROOT_DIR}/src/Event.h"
-	"${BL_ROOT_DIR}/src/Layer.h"
-	"${BL_ROOT_DIR}/src/Random.h"
-	"${BL_ROOT_DIR}/src/Random.cpp"
-	"${BL_ROOT_DIR}/src/Application.h"
-	"${BL_ROOT_DIR}/src/Application.cpp"
-	"${BL_ROOT_DIR}/src/Window.h"
-	"${BL_ROOT_DIR}/src/Window.cpp"
-	"${BL_ROOT_DIR}/src/Renderer.h"
-	"${BL_ROOT_DIR}/src/Renderer.cpp"
-	"${BL_ROOT_DIR}/src/SimLayer.h"
-	"${BL_ROOT_DIR}/src/SimLayer.cpp"
-	"${BL_ROOT_DIR}/src/Generation.h"
-	"${BL_ROOT_DIR}/src/Generation.cpp"
-	"${BL_ROOT_DIR}/src/Platform.h"
-	"${BL_ROOT_DIR}/src/Platform.cpp"
-	"${BL_ROOT_DIR}/src/Car.h"
-	"${BL_ROOT_DIR}/src/Car.cpp"
-	"${BL_ROOT_DIR}/src/ImGuiBuild.cpp"
-)
+
+#--------------------------------------------------------------------------------------------------
+#	Build
+#--------------------------------------------------------------------------------------------------
 add_executable(Blobolution ${BL_SRC})
-target_precompile_headers(Blobolution PRIVATE "${BL_ROOT_DIR}/src/BlobolutionPch.pch")
-target_include_directories(Blobolution PRIVATE "${BL_ROOT_DIR}/src")
-target_link_libraries(Blobolution PRIVATE glfw glad glm box2d imgui)
+target_include_directories(Blobolution PRIVATE ${BL_HSP})
+target_precompile_headers(Blobolution PRIVATE "${BL_SRC_DIR}/Prefix.pch")
+target_link_libraries(Blobolution PRIVATE glad glfw glm box2d imgui)
 
-
-# Resources
-set(BL_RES
+set_target_properties(Blobolution PROPERTIES
+	VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:Blobolution>
 )
-file(COPY ${BL_RES} DESTINATION "res")
+
+
+#--------------------------------------------------------------------------------------------------
+#	Resources
+#--------------------------------------------------------------------------------------------------
+add_custom_target(Blobolution_CopyResources ALL
+	COMMAND ${CMAKE_COMMAND} -E copy_directory ${BL_RES_DIR} $<TARGET_FILE_DIR:Blobolution>
+)
